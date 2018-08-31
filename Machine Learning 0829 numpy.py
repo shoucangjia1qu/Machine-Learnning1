@@ -67,7 +67,7 @@ B=np.array([[4,2,5]])
 np.linalg.norm(A-B)         #A和B两点之间的距离
 np.sqrt(np.sum(np.power((A-B),2)))      #平方和开根号
 
-#0830各类距离的意义以及python的实现
+##################0830各类距离的意义以及python的实现###################
 ##闵科夫斯基距离（Minkowski Distance）
 ##欧氏距离（Euclidean Distance）
 Ma=np.mat([1,2,3])
@@ -93,8 +93,21 @@ import scipy.spatial.distance as dist
 M = np.mat([[1,1,0,1,0,1,0,0,1],[0,1,1,0,0,0,1,1,1]])
 dist.pdist(M,metric="jaccard")
 
-
-
+##################0831相关性###################
+#相关系数，衡量两个特征列之间的相关度
+cov = np.mean(np.multiply((Ma-np.mean(Ma)),(Mb-np.mean(Mb))))       #协方差，不过这里的自由度是n，不是(n-1)
+corr1 = cov/(np.std(Ma)*np.std(Mb))         #相关系数
+corr2 = np.corrcoef(Ma,Mb)          #直接得出相关系数矩阵
+##################马氏距离###################
+#马氏距离排除变量之间的干扰，比如：身高、体重单位不同的影响
+#协方差矩阵
+covmatrix = np.cov(Ma,Mb)
+covinv = np.linalg.inv(covmatrix)       #协方差矩阵的逆矩阵，两个变量之间的协方差
+M = np.mat([[1,2,3],[4,7,5]])
+Mt = M.T                #相当于三个样本，两个变量
+distma = np.sqrt(np.dot(np.dot((Mt[0]-Mt[1]),covinv),(Mt[0]-Mt[1]).T))      #样本0和样本1的马氏距离
+distma = np.sqrt(np.dot(np.dot((Mt[1]-Mt[2]),covinv),(Mt[1]-Mt[2]).T))      #样本1和样本2的马氏距离，结果和上面一样
+distma = np.sqrt(np.dot(np.dot((Mt[0]-Mt[2]),covinv),(Mt[0]-Mt[2]).T))      #样本1和样本2的马氏距离，结果也和上面一样
 
 
 
