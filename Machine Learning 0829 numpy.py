@@ -67,3 +67,52 @@ B=np.array([[4,2,5]])
 np.linalg.norm(A-B)         #A和B两点之间的距离
 np.sqrt(np.sum(np.power((A-B),2)))      #平方和开根号
 
+#0830各类距离的意义以及python的实现
+##闵科夫斯基距离（Minkowski Distance）
+##欧氏距离（Euclidean Distance）
+Ma=np.mat([1,2,3])
+Mb=np.mat([4,7,5])
+dis = np.sqrt((a-b)*((a-b).T))              #其实就是L2范数
+dis = np.linalg.norm(a-b)
+dis = np.sqrt(np.sum(np.power((a-b),2)))
+##曼哈顿距离（Manhattan Distance）
+dis = np.sum(abs(a-b))                      #其实就是L1范数
+##切比雪夫距离（Chebyshev Distance）
+dis = abs(a-b).max()                        #坐标差值最大的值
+##夹角余弦（Cosine）
+dis = np.dot(a,b.T)/(np.linalg.norm(a)*np.linalg.norm(b))
+##汉明距离(Hamming Distance)
+a=np.mat([1,1,0,1,0,1,0,0,1])
+b=np.mat([0,1,1,0,0,0,1,1,1])
+smstr = np.nonzero(a-b)
+print(np.shape(smstr)[1])               #信息编码转成另外一个所需要的最小替换次数
+##杰卡德相似系数（Jaccard Similarity Coefficient）
+###杰卡德相似系数是指两个集合中的交集元素占并集元素的比重
+###杰卡德距离是指两个集合的非交集元素占并集元素的比重
+import scipy.spatial.distance as dist
+M = np.mat([[1,1,0,1,0,1,0,0,1],[0,1,1,0,0,0,1,1,1]])
+dist.pdist(M,metric="jaccard")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
