@@ -167,8 +167,4 @@ plt.scatter(dist.T.tolist()[0],dist.T.tolist()[1])
 for point in dist.tolist():
     #添加注释
     plt.annotate("("+str(point[0])+","+str(point[1])+")",xy=(point[0],point[1]))
-##################数据处理###################
-
-
-
 
