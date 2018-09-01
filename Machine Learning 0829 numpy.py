@@ -109,22 +109,65 @@ distma = np.sqrt(np.dot(np.dot((Mt[0]-Mt[1]),covinv),(Mt[0]-Mt[1]).T))      #样
 distma = np.sqrt(np.dot(np.dot((Mt[1]-Mt[2]),covinv),(Mt[1]-Mt[2]).T))      #样本1和样本2的马氏距离，结果和上面一样
 distma = np.sqrt(np.dot(np.dot((Mt[0]-Mt[2]),covinv),(Mt[0]-Mt[2]).T))      #样本1和样本2的马氏距离，结果也和上面一样
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+##################0901###################
+#特征值和特征向量
+A=[[8,1,6],[3,5,7],[4,9,2]]
+evals, evecs=np.linalg.eig(A)       #np.linalg直接求解
+#先求出系数工程，x**3-15*x**2-24x+360=0，再求解可得出x的值，也就是特征值
+equationA = [1,-15,-24,360]
+evals = np.roots(equationA)
+#还原原矩阵，这个感觉有点不对
+sigma = evals*np.eye(3)
+Aori = evecs*sigma*np.linalg.inv(evecs)
+##################归一化###################
+#数据标准化（欧式距离标准化）
+M = np.mat([[1,2,3],[4,5,6]])
+#普通欧氏距离求法
+delta = M[0]-M[1]
+DistOU = np.sqrt(delta*delta.T)
+#标准化后的欧氏距离求法
+std = np.std(M,axis=1)
+mean = np.mean(M)
+normM = (M-mean)/std
+normdelta = normM[0]-normM[1]
+DistnormOU = np.sqrt(normdelta*normdelta.T)
+##################数据处理###################
+#数据保存先放一下
+#数据可视化（表与线性结构）
+import numpy as np
+import matplotlib.pyplot as plt
+x = np.linspace(-5,5,200)
+y = np.sin(x)
+#加入噪音
+yn =y+np.random.rand(len(y))
+fig=plt.figure()
+#加入画板，使得图片呈现在一起
+#ax=fig.add_subplot(211)
+plt.scatter(x,yn)
+plt.plot(x,y+0.5,"r--")
+plt.show()
+#数据可视化（树与分类结构）
+import numpy as np
+import matplotlib.pyplot as plt
+#import treePlotter as tp     #这是一个自己编写的包
+myTree = {'root': {0:'leaf node',1:{'level21':{0:'leaf node2',1:'leaf node2'}},2:{'level22':{0:'leaf node21',1:'leaf node22'}}}}
+tp.createPlot(myTree)
+#数据可视化（树与分类结构）
+import numpy as np
+import matplotlib.pyplot as plt
+dist = np.mat([[0.1,0.1],[0.9,0.5],[0.9,0.1],[0.45,0.9],[0.9,0.8],[0.7,0.9],[0.1,0.45],[0.45,0.1]])
+m,n=dist.shape
+#m,n=np.shape(dist)
+fig=plt.figure()
+ax=fig.add_subplot(212)
+#自己的方法
+plt.plot(dist.T.tolist()[0],dist.T.tolist()[1],"r--")
+plt.scatter(dist.T.tolist()[0],dist.T.tolist()[1])
+#书中的方法
+for point in dist.tolist():
+    #添加注释
+    plt.annotate("("+str(point[0])+","+str(point[1])+")",xy=(point[0],point[1]))
+##################数据处理###################
 
 
 
