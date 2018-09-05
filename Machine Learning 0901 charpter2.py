@@ -44,11 +44,24 @@ for dirname in subdirs:
             savefile(savepath+"\\"+file," ".join(f))      #存储分词后文件
             print(file+'分词成功')        
 
+'''转换为Bunch类'''
+wordbag_path = "train_set.dat"
+from sklearn.datasets.base import Bunch
+bunch=Bunch(target_name=[],label=[],filename=[],contents=[])
+bunch.target_name.extend(subdirs)
+for dirname in subdirs:
+    classpath = dirname+savedir
+    filenames = os.listdir(classpath)
+    for file in filenames:
+        fullpath = classpath+"\\"+file
+        bunch.label.append(dirname)
+        bunch.filename.append(fullpath)
+        bunch.contents.append(readfile(fullpath).strip())
 
-
-
-
-
+'''对象持久化'''
+import pickle
+with open(curpath+"\\"+wordbag_path,"wb") as obj:
+    pickle.dump(bunch,obj)
 
 
 
