@@ -63,6 +63,66 @@ import pickle
 with open(curpath+"\\"+wordbag_path,"wb") as obj:
     pickle.dump(bunch,obj)
 
+'''导入停用词'''
+stop_path = curpath+"\\stop\\stopwords.txt"
+stoplist = readfile(stop_path).splitlines()
+
+###################将分词变为词向量并储存##################
+'''TF-IDF方法'''
+'''
+TF:文本在向量中出现的概率分布，词频
+IDF:文本在词袋中出现的频率
+权重策略：词频高，且在其他文章中很少出现，适合用来分类
+'''
+import sys,os,pickle    #引入持久化类
+from imp import reload
+from sklearn.datasets.base import Bunch    #引入Bunch类
+from sklearn import feature_extraction
+from sklearn.feature_extraction.text import TfidfTransformer    #TF-IDF向量转换类
+from sklearn.feature_extraction.text import TfidfVectorizer     #TF-IDF向量生成类
+'''配置输出UTF-8'''
+reload(sys)
+sys.setdefaultencoding("utf-8")
+'''读取Bunch对象'''
+def readbunchobj(path):
+    with open(path,"rb") as file_obj:
+        bunch = pickle.load(file_obj)
+        return bunch
+'''写入bunch对象'''
+def writebunchobj(path,bunch):
+    with open(path,"wb") as obj:
+        pickle.dump(bunch,obj)
+'''主程序'''
+'''1、导入分词后的词向量Bunch对象'''
+bunch_path = curpath+"\\train_set.dat"
+bunch = readbunchobj(bunch_path)
+'''2、构建TF-IDF词向量空间对象'''
+tfidfspace = Bunch(target_name=bunch.target_name, label=bunch.label, filenames=bunch.filename,
+                   tdm=[], vocabulary={})
+'''3、使用TfidfVectorizer初始化向量空间模型'''
+vectorizer = TfidfVectorizer(stop_words=stoplist, sublinear_tf=True, max_df=0.5)
+transformer = TfidfTransformer()    #统计每个词语的TF-IDF权重
+text=[i.decode("GBK","ignore") for i in bunch.contents]     '''将二进制转为unicode'''
+tfidfspace.tdm = vectorizer.fit_transform(text)
+tfidfspace.vocabulary = vectorizer.vocabulary_
+'''4、持久化向量词袋'''
+space_path = curpath+"\\tfidfspace.dat"
+writebunchobj(space_path,tfidfspace)
+
+###################训练模型##################
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
