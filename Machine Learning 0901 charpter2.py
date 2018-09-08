@@ -35,7 +35,7 @@ for dirname in subdirs:
         os.mkdir(savepath)
     for file in files:
         if file == "分词结果":
-            break
+            continue
         else:
             content=readfile(dirname+"\\"+file).strip()   #读取文本内容
             content=content.decode("GBK","ignore")        
@@ -102,7 +102,7 @@ tfidfspace = Bunch(target_name=bunch.target_name, label=bunch.label, filenames=b
 '''3、使用TfidfVectorizer初始化向量空间模型'''
 vectorizer = TfidfVectorizer(stop_words=stoplist, sublinear_tf=True, max_df=0.5)
 transformer = TfidfTransformer()    #统计每个词语的TF-IDF权重
-text=[i.decode("GBK","ignore") for i in bunch.contents]     '''将二进制转为unicode'''
+text=[i.decode("GBK","ignore") for i in bunch.contents]     #将二进制转为unicode
 tfidfspace.tdm = vectorizer.fit_transform(text)
 tfidfspace.vocabulary = vectorizer.vocabulary_
 '''4、持久化向量词袋'''
@@ -110,17 +110,43 @@ space_path = curpath+"\\tfidfspace.dat"
 writebunchobj(space_path,tfidfspace)
 
 ###################训练模型##################
+'''1、读入训练集bunch对象'''
+import pickle
+train_path = curpath+"\\tfidfspace.dat"
+with open(curpath+"\\tfidfspace.dat","rb") as file:
+    train_bunch = pickle.load(file)
+'''2、测试集'''
+import os,jieba
+'''二进制读入文件'''
+def readf(path):
+    with open(path,'rb') as f:
+        content = f.read()
+        return content
+'''二进制写入文件'''
+def savef(path,content):
+    with open(path,'wb') as f:
+        f.write(content.encode("GBK"))
+test_path = curpath+"\\test"
+'''遍历测试文件夹下文件'''
+test_dir = os.listdir(test_path)
+test_savedir = test_path+"\\result"
+for i in test_dir:
+    if i == "result":
+        continue
+    else:
+        test_filepath = test_path+"\\"+i
+        if not os.path.exists(test_savedir):
+                os.mkdir(test_savedir)
+        for j in os.listdir(test_filepath):
+            test_filename = test_filepath+"\\"+j
+            content=readf(test_filename)
+            content=content.decode("GBK","ignore")        
+            content=content.replace("\r\n","").strip()      #去除换行等
+            cutwds=jieba.cut(content)        #开始分词
+            savef(test_savedir+"\\"+j," ".join(cutwds))      #存储分词后文件
+            print(j+'分词成功') 
 
-
-
-
-
-
-
-
-
-
-
+            
 
 
 
