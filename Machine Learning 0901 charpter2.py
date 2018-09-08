@@ -109,7 +109,20 @@ tfidfspace.vocabulary = vectorizer.vocabulary_
 space_path = curpath+"\\tfidfspace.dat"
 writebunchobj(space_path,tfidfspace)
 
-###################训练模型##################
+
+
+
+
+
+
+
+
+
+#########################################
+#                                       #
+#               实例                    #
+#                                       #
+#########################################
 '''1、读入训练集bunch对象'''
 import pickle
 train_path = curpath+"\\tfidfspace.dat"
@@ -145,15 +158,62 @@ for i in test_dir:
             cutwds=jieba.cut(content)        #开始分词
             savef(test_savedir+"\\"+j," ".join(cutwds))      #存储分词后文件
             print(j+'分词成功') 
-
-            
-
-
-
-
-
-
-
-
-
+'''构建测试集Bunch类'''
+testbag_path = "test\\test_set.dat"
+from sklearn.datasets.base import Bunch
+testbunch = Bunch(target_name=[], label=[], filenames=[],contents=[])
+testbunch.target_name.extend(test_dir)
+for subdir in test_dir:
+    if subdir=="result":
+        continue
+    tfilepath = test_path+"\\"+subdir
+    filenames = os.listdir(tfilepath)
+    for file in filenames:
+        fullpath = test_savedir+"\\"+file
+        testbunch.label.append(subdir)
+        testbunch.filenames.append(fullpath)
+        testbunch.contents.append(readfile(fullpath).strip())
+'''持久化'''
+with open(curpath+"\\"+testbag_path,"wb") as obj:
+    pickle.dump(testbunch,obj)
+'''写入测试集数据'''
+with open(curpath+"\\"+testbag_path,'rb') as testf:
+    testbunch = pickle.load(testf)
+'''导入停用词'''
+stop_path = curpath+"\\stop\\stopwords.txt"
+stoplist = readfile(stop_path).splitlines()
+'''构建词向量对象'''
+tfidftest = Bunch(target_name=testbunch.target_name, label=testbunch.label, filenames=testbunch.filenames,
+                   tdm=[], vocabulary={})
+from sklearn import feature_extraction
+from sklearn.feature_extraction.text import TfidfTransformer    #TF-IDF向量转换类
+from sklearn.feature_extraction.text import TfidfVectorizer     #TF-IDF向量生成类
+'''构建测试集向量时需使用训练集词袋向量'''
+vectorizer = TfidfVectorizer(stop_words=stoplist, sublinear_tf=True, max_df=0.5,
+                             vocabulary=train_bunch.vocabulary)
+transformer = TfidfTransformer()    #统计每个词语的TF-IDF权重
+text=[i.decode("GBK","ignore") for i in testbunch.contents]     #将二进制转为unicode
+tfidftest.tdm = vectorizer.fit_transform(text)
+tfidftest.vocabulary = train_bunch.vocabulary
+'''3、使用贝叶斯分类对文本进行分类'''
+from sklearn.naive_bayes import MultinomialNB
+clf = MultinomialNB(alpha=0.001).fit(train_bunch.tdm,train_bunch.label)
+'''4、预测'''
+pre=clf.predict(tfidftest.tdm)
+pro=clf.predict_proba(tfidftest.tdm)
+'''5、查看精度'''
+la=tfidftest.label
+file=tfidftest.filenames
+n=0
+for a,b,c in zip(la,file,pre):
+    print(a,b,c)
+    if a==c:
+        n+=1
+auc=n/len(pre)
+print("AUC:%.3f"%auc)
+'''6、评估'''
+import numpy as np
+import pandas as pd
+from sklearn import metrics
+mt=metrics.classification_report(la,pre)
 
