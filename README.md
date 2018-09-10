@@ -59,6 +59,8 @@ DistnormOU = np.sqrt(delta,delta.T)     #欧氏距离公式
 # Machine-Learning2
 文本分析
 ## 2018-09-10
+``` python
+'''
 1、分词
 2、分词结果转换为Bunch类并持久化
 3、分词向量化（TF-IDF方法）——词频高且在词袋中出现的概率低，适合用来分类
@@ -66,3 +68,7 @@ DistnormOU = np.sqrt(delta,delta.T)     #欧氏距离公式
 5、训练模型
 6、导入测试集
 7、模型评估
+'''
+```
+
+
