@@ -110,14 +110,6 @@ space_path = curpath+"\\tfidfspace.dat"
 writebunchobj(space_path,tfidfspace)
 
 
-
-
-
-
-
-
-
-
 #########################################
 #                                       #
 #               实例                    #
@@ -216,4 +208,55 @@ import numpy as np
 import pandas as pd
 from sklearn import metrics
 mt=metrics.classification_report(la,pre)
+
+
+#########################################
+#                                       #
+#               推导                    #
+#实现朴素贝叶斯算法                      #
+#########################################
+'''1、定义训练集文本、类别标签'''
+def loadDataSet():
+    postingList=[['my','dog','has','flea','problems','help','please'],
+                 ['maybe','not','take','him','to','dog','park','stupid'],
+                 ['my','dalmation','is','so','cute','I','love','him','my'],
+                 ['stop','posting','stupid','worthless','garbage'],
+                 ['mr','licks','ate','my','steak','how','to','stop','him'],
+                 ['quit','buying','worthless','dog','food','stupid']]
+    classVec=[0,1,0,1,0,1]
+    return postingList,classVec
+'''2、编写贝叶斯算法类，并创建默认的构造方法'''
+class NBayes(object):
+    def __init__(self):
+        self.vocabulary=[]      #词典
+        self.idf=0              #词典的IDF权值向量
+        self.tf=0               #训练集的权值矩阵
+        self.tdm=0              #P(x|y)
+        self.Pcates={}          #P(y)类别字典
+        self.labels=[]          #每个文本分类
+        self.doclength=0        #训练集本文长度
+        self.vocablen=0         #词典词长
+        self.testset=0          #训练集
+'''3、导入和训练数据集'''
+def train_set(self,trainset,classVec):
+    self.cate_prob(classVec)        #计算每个分类的概率，函数
+    self.doclength=len(trainset)    #文本长度
+    tempset=set()                   #生成字典key值的集合
+    [tempset.add(word) for doc in trainset for word in doc]     #不重复地合成每个分词
+    self.vocabulary = list(tempset) #转换为词典
+    self.vocablen = len(self.vocabulary)      #词典词长
+    self.wordfre(trainset)          #统计词频数据集，函数
+    self.buildtdm()                 #计算P(x|y)条件概率，函数
+'''4、计算P(y)的概率'''
+def cate_prob(self,classVec):
+    self.labels=classVec            #获取所有的分类数据
+    labeltemps=set(self.labels)     #获取全部分类类别组成的集合
+    for labeltemp in labeltemps:
+        classtimes=self.labels.count(labeltemp)     #统计某个类别的频次
+        self.Pcates[labeltemp]=float(classtimes)/float(len(self.labels))    #计算某个类别出现的概率
+'''5、'''
+        
+    
+    
+
 
