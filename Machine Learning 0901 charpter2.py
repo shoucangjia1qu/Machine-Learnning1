@@ -240,7 +240,7 @@ class NBayes(object):
 '''3、导入和训练数据集'''
 def train_set(self,trainset,classVec):
     self.cate_prob(classVec)        #计算每个分类的概率，函数
-    self.doclength=len(trainset)    #文本长度
+    self.doclength=len(trainset)    #训练集文本数
     tempset=set()                   #生成字典key值的集合
     [tempset.add(word) for doc in trainset for word in doc]     #不重复地合成每个分词
     self.vocabulary = list(tempset) #转换为词典
@@ -254,8 +254,17 @@ def cate_prob(self,classVec):
     for labeltemp in labeltemps:
         classtimes=self.labels.count(labeltemp)     #统计某个类别的频次
         self.Pcates[labeltemp]=float(classtimes)/float(len(self.labels))    #计算某个类别出现的概率
-'''5、'''
-        
+'''5、生成普通词频向量'''
+def wrdfreq(self,trainset):
+    self.idf = np.zeros([1,self.vocablen])      #1x词典数的矩阵
+    self.td = np.zeros([self.doclength,self.vocablen])      #训练集文本数x词典数的矩阵
+    for index in range(self.doclength):
+        for word in trainset[index]:
+            self.td[index,self.vocabulary.index(word)] += 1
+        for singlewrd in set(trainset[index]):
+            self.idf[0,self.vocabulary.index(singlewrd)] += 1
+'''6、生成每维值P(x|y)矩阵'''
+
     
     
 
