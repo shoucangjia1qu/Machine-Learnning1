@@ -255,7 +255,7 @@ def cate_prob(self,classVec):
         classtimes=self.labels.count(labeltemp)     #统计某个类别的频次
         self.Pcates[labeltemp]=float(classtimes)/float(len(self.labels))    #计算某个类别出现的概率
 '''5、生成普通词频向量'''
-def wrdfreq(self,trainset):
+def wrd_freq(self,trainset):
     self.idf = np.zeros([1,self.vocablen])      #1x词典数的矩阵
     self.td = np.zeros([self.doclength,self.vocablen])      #训练集文本数x词典数的矩阵
     for index in range(self.doclength):
@@ -264,8 +264,31 @@ def wrdfreq(self,trainset):
         for singlewrd in set(trainset[index]):
             self.idf[0,self.vocabulary.index(singlewrd)] += 1
 '''6、生成每维值P(x|y)矩阵'''
-
-    
-    
-
+def build_tdm(self):
+    self.tdm = np.zeros([len(self.Pcates),self.vocablen])       #每个类别的词频统计
+    sumlist = np.zeros([len(self.Pcates),1])        #每个类别的词频汇总
+    for index in range(self.doclength):
+        self.tdm[self.labels[index]] += self.td[index]
+        sumlist[self.labels[index]] = np.sum(self.tdm[self.labels[index]])
+    self.tdm = self.tdm/sumlist         #生成P(x|y)最终矩阵
+'''7、将测试集映射到当前词典中'''
+def map2vocab(self,testdata):
+    self.testset = np.zeros([1,self.vocablen])
+    for word in testdata:
+        self.testset[0,self.vocabulary.index(word)]+=1
+'''8、预测函数'''   
+def predict(self,testset):
+    if np.shape(testset)[1] != self.vocablen:
+        print("输入错误")
+        exit(0)
+    else:
+        predvalue=0     #初始化类别概率
+        predcalss=""    #初始化类别名臣
+        for tdm_vect,keyclass in zip(self.tdm,self.Pcates):
+            #计算P(x|y)*P(y)
+            temp = np.sum(testset*tdm_vect*self.Pcates[keyclass])
+            if temp > predvalue:
+                predvalue = temp
+                predcalss = keyclass
+        return keyclass
 
