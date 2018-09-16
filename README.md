@@ -70,5 +70,111 @@ DistnormOU = np.sqrt(delta,delta.T)     #欧氏距离公式
 7、模型评估
 '''
 ```
+## 2018-09-16 贝叶斯分类器
+1、构造一个贝叶斯分类器
+``` python
+#定义训练集文本，简单构造一个。
+def loadDataSet():
+    postingList=[['my','dog','has','flea','problems','help','please'],
+                 ['maybe','not','take','him','to','dog','park','stupid'],
+                 ['my','dalmation','is','so','cute','I','love','him','my'],
+                 ['stop','posting','stupid','worthless','garbage'],
+                 ['mr','licks','ate','my','steak','how','to','stop','him'],
+                 ['quit','buying','worthless','dog','food','stupid']]
+    classVec=[0,1,0,1,0,1]
+    return postingList,classVec
+#编写贝叶斯算法类
+class NBayes(object):
+    def __init__(self):
+        self.vocabulary = []    #文本词典
+        self.idf = 0      #文本的idf权重
+        self.tf = 0       #文本词向量矩阵
+        self.tdm = 0      #P(x|y)每个类别的概率矩阵
+        self.Pcates={}    #类别概率字典
+        self.labels=[]     #文本分类列表
+        self.doclength = 0  #文本数量
+        self.vocablen = 0   #词典数量
+        self.testset = 0    #测试集
+    #导入和训练训练集数据
+    def train_set(self,trainset,classVec):
+        '''1、分类概率'''
+        self.cate_prob(classVec)      #自建函数，计算每个分类类别的概率
+        '''2、文本数'''
+        self.doclength = len(self.trainset)     #训练集文本数
+        '''3、词典'''
+        tempset = set()       #创建词典集合
+        [tempset.add(word) for doc in trainset for word in doc]     #不重复地合成每个分词
+        self.vocabulary = list(tempset)     #转换为词典
+        '''4、词典词长'''
+        self.vocablen = len(self.vocabulary)
+        '''5、统计词频'''
+        self.wrd_freq(trainset)          #统计词频数据集，函数
+        '''6、计算tdm'''
+        self.build_tdm()                 #计算P(x|y)条件概率，函数
+    #计算每个分类的概率
+    def cate_prob(self,classVec):
+        self.labels = classVec
+        labelcates = set(self.labels)
+        for templabel in labelcates:
+            classtimes = self.labels.count(templabel)
+            self.Pcates[templabel] = float(classtimes)/float(len(self.labels))
+    #生成普通词频向量
+    def wrd_freq(self,trainset):
+        self.idf = np.zeros([1,self.vocablen])
+        self.tf = np.zeros([self.doclength,self.vocablen])
+        for row in range(self.doclength):
+            for word in trainset[row]:
+                self.tf[row,self.vocabulary.index(word)] += 1
+            for singleword in set(trainset[row]):
+                self.idf[0,self.vocabulary.index(singleword)] += 1
+    #生成TF-IDF权重向量
+    def wrd_tfidf(self,trainset):
+        self.idf = np.zeros([1,self.vocablen])
+        self.tf = np.zeros([self.doclength,self.vocablen])
+        for row in range(self.doclength):
+            for word in trainset[row]:
+                self.tf[row,self.vocabulary.index(word)] += 1
+            self.tf[row] = self.tf[row]/float(len(self.tf[row]))
+            for singleword in set(trainset[row]):
+                self.idf[0,self.vocabulary.index(singleword)] += 1
+        self.idf = np.log(self.doclength/self.idf)
+        self.tf = np.multiply(self.tf,self.idf)
+    #生成tdm
+    def build_tdm(self):
+        self.tdm = np.zeros([len(self.Pcates),self.vocablen])
+        sumlist = np.zeros([len(self.Pcates),1])
+        for row in range(self.doclength):
+            self.tdm[self.labels[row]] += self.tf[row]
+            sumlist = len(self.tdm[self.labels[rows]])
+        self.tdm = self.tdm/sumlist
+    #生成测试集向量
+    def map2vocab(self,testdata):
+        self.testset = np.zeros([1,self.vocablen])
+        for word in testdata:
+            self.testset[1,self.vocabulary.index(word)] += 1
+    #预测函数
+    def predict(self,testset):
+        if self.testset.shape[1] != self.vocablen:
+            print("测试集错误")
+            exit(0)
+        else:
+            predvalue = 0
+            predclass = ""
+            for subtdm, subclass in zip(self.tdm, self.Pcates):
+                temp = np.sum(testset*subtdm*self.Pcates[subclass])
+                if temp > predvalue:
+                    predvalue = temp
+                    predclass = self.Pcates[subclass]
+            return(predvalue,predclass)
+#开始测试一个
+dataset,listclass = loadDataSet()
+nb = NBayes()
+nb.train_set()
+nb.map2vocab(dataset[0])
+print(nb.predict(nb.testset))
+```
+2、直接调用scikit-learn实例
+``` python
 
 
+```
