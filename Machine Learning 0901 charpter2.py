@@ -237,58 +237,159 @@ class NBayes(object):
         self.doclength=0        #训练集本文长度
         self.vocablen=0         #词典词长
         self.testset=0          #训练集
-'''3、导入和训练数据集'''
-def train_set(self,trainset,classVec):
-    self.cate_prob(classVec)        #计算每个分类的概率，函数
-    self.doclength=len(trainset)    #训练集文本数
-    tempset=set()                   #生成字典key值的集合
-    [tempset.add(word) for doc in trainset for word in doc]     #不重复地合成每个分词
-    self.vocabulary = list(tempset) #转换为词典
-    self.vocablen = len(self.vocabulary)      #词典词长
-    self.wordfre(trainset)          #统计词频数据集，函数
-    self.buildtdm()                 #计算P(x|y)条件概率，函数
-'''4、计算P(y)的概率'''
-def cate_prob(self,classVec):
-    self.labels=classVec            #获取所有的分类数据
-    labeltemps=set(self.labels)     #获取全部分类类别组成的集合
-    for labeltemp in labeltemps:
-        classtimes=self.labels.count(labeltemp)     #统计某个类别的频次
-        self.Pcates[labeltemp]=float(classtimes)/float(len(self.labels))    #计算某个类别出现的概率
-'''5、生成普通词频向量'''
-def wrd_freq(self,trainset):
-    self.idf = np.zeros([1,self.vocablen])      #1x词典数的矩阵
-    self.td = np.zeros([self.doclength,self.vocablen])      #训练集文本数x词典数的矩阵
-    for index in range(self.doclength):
-        for word in trainset[index]:
-            self.td[index,self.vocabulary.index(word)] += 1
-        for singlewrd in set(trainset[index]):
-            self.idf[0,self.vocabulary.index(singlewrd)] += 1
-'''6、生成每维值P(x|y)矩阵'''
-def build_tdm(self):
-    self.tdm = np.zeros([len(self.Pcates),self.vocablen])       #每个类别的词频统计
-    sumlist = np.zeros([len(self.Pcates),1])        #每个类别的词频汇总
-    for index in range(self.doclength):
-        self.tdm[self.labels[index]] += self.td[index]
-        sumlist[self.labels[index]] = np.sum(self.tdm[self.labels[index]])
-    self.tdm = self.tdm/sumlist         #生成P(x|y)最终矩阵
-'''7、将测试集映射到当前词典中'''
-def map2vocab(self,testdata):
-    self.testset = np.zeros([1,self.vocablen])
-    for word in testdata:
-        self.testset[0,self.vocabulary.index(word)]+=1
-'''8、预测函数'''   
-def predict(self,testset):
-    if np.shape(testset)[1] != self.vocablen:
-        print("输入错误")
-        exit(0)
-    else:
-        predvalue=0     #初始化类别概率
-        predcalss=""    #初始化类别名臣
-        for tdm_vect,keyclass in zip(self.tdm,self.Pcates):
-            #计算P(x|y)*P(y)
-            temp = np.sum(testset*tdm_vect*self.Pcates[keyclass])
-            if temp > predvalue:
-                predvalue = temp
-                predcalss = keyclass
-        return keyclass
+    '''3、导入和训练数据集'''
+    def train_set(self,trainset,classVec):
+        self.cate_prob(classVec)        #计算每个分类的概率，函数
+        self.doclength=len(trainset)    #训练集文本数
+        tempset=set()                   #生成字典key值的集合
+        [tempset.add(word) for doc in trainset for word in doc]     #不重复地合成每个分词
+        self.vocabulary = list(tempset) #转换为词典
+        self.vocablen = len(self.vocabulary)      #词典词长
+        self.wrd_freq(trainset)          #统计词频数据集，函数
+        self.build_tdm()                 #计算P(x|y)条件概率，函数
+    '''4、计算P(y)的概率'''
+    def cate_prob(self,classVec):
+        self.labels=classVec            #获取所有的分类数据
+        labeltemps=set(self.labels)     #获取全部分类类别组成的集合
+        for labeltemp in labeltemps:
+            classtimes=self.labels.count(labeltemp)     #统计某个类别的频次
+            self.Pcates[labeltemp]=float(classtimes)/float(len(self.labels))    #计算某个类别出现的概率
+    '''5、生成普通词频向量'''
+    def wrd_freq(self,trainset):
+        self.idf = np.zeros([1,self.vocablen])      #1x词典数的矩阵
+        self.tf = np.zeros([self.doclength,self.vocablen])      #训练集文本数x词典数的矩阵
+        for index in range(self.doclength):
+            for word in trainset[index]:
+                self.tf[index,self.vocabulary.index(word)] += 1
+            for singlewrd in set(trainset[index]):
+                self.idf[0,self.vocabulary.index(singlewrd)] += 1
+    '''6、生成每维值P(x|y)矩阵'''
+    def build_tdm(self):
+        self.tdm = np.zeros([len(self.Pcates),self.vocablen])       #每个类别的词频统计
+        sumlist = np.zeros([len(self.Pcates),1])        #每个类别的词频汇总
+        for index in range(self.doclength):
+            self.tdm[self.labels[index]] += self.tf[index]
+            sumlist[self.labels[index]] = np.sum(self.tdm[self.labels[index]])
+        self.tdm = self.tdm/sumlist         #生成P(x|y)最终矩阵
+    '''7、将测试集映射到当前词典中'''
+    def map2vocab(self,testdata):
+        self.testset = np.zeros([1,self.vocablen])
+        for word in testdata:
+            self.testset[0,self.vocabulary.index(word)]+=1
+    '''8、预测函数'''   
+    def predict(self,testset):
+        if np.shape(testset)[1] != self.vocablen:
+            print("输入错误")
+            exit(0)
+        else:
+            predvalue=0     #初始化类别概率
+            predcalss=""    #初始化类别名臣
+            for tdm_vect,keyclass in zip(self.tdm,self.Pcates):
+                #计算P(x|y)*P(y)
+                temp = np.sum(testset*tdm_vect*self.Pcates[keyclass])
+                if temp > predvalue:
+                    predvalue = temp
+                    predcalss = keyclass
+            return keyclass
+'''查看结果'''
+dataset,listclass = loadDataSet()
+nb = NBayes()       #实例化
+nb.train_set(dataset,listclass)
+nb.map2vocab(dataset[5])
+print(nb.predict(nb.testset))
 
+
+#########################################
+#                                       #
+#               推导                    #
+#算法改进                               #                          
+#########################################
+'''1、定义训练集文本、类别标签'''
+def loadDataSet():
+    postingList=[['my','dog','has','flea','problems','help','please'],
+                 ['maybe','not','take','him','to','dog','park','stupid'],
+                 ['my','dalmation','is','so','cute','I','love','him','my'],
+                 ['stop','posting','stupid','worthless','garbage'],
+                 ['mr','licks','ate','my','steak','how','to','stop','him'],
+                 ['quit','buying','worthless','dog','food','stupid']]
+    classVec=[0,1,0,1,0,1]
+    return postingList,classVec
+'''2、编写贝叶斯算法类，并创建默认的构造方法'''
+class NBayes(object):
+    def __init__(self):
+        self.vocabulary=[]      #词典
+        self.idf=0              #词典的IDF权值向量
+        self.tf=0               #训练集的权值矩阵
+        self.tdm=0              #P(x|y)
+        self.Pcates={}          #P(y)类别字典
+        self.labels=[]          #每个文本分类
+        self.doclength=0        #训练集本文长度
+        self.vocablen=0         #词典词长
+        self.testset=0          #训练集
+    '''3、导入和训练数据集'''
+    def train_set(self,trainset,classVec):
+        self.cate_prob(classVec)        #计算每个分类的概率，函数
+        self.doclength=len(trainset)    #训练集文本数
+        tempset=set()                   #生成字典key值的集合
+        [tempset.add(word) for doc in trainset for word in doc]     #不重复地合成每个分词
+        self.vocabulary = list(tempset) #转换为词典
+        self.vocablen = len(self.vocabulary)      #词典词长
+        self.wrd_tfidf(trainset)          #统计词频数据集，函数
+        self.build_tdm()                 #计算P(x|y)条件概率，函数
+    '''4、计算P(y)的概率'''
+    def cate_prob(self,classVec):
+        self.labels=classVec            #获取所有的分类数据
+        labeltemps=set(self.labels)     #获取全部分类类别组成的集合
+        for labeltemp in labeltemps:
+            classtimes=self.labels.count(labeltemp)     #统计某个类别的频次
+            self.Pcates[labeltemp]=float(classtimes)/float(len(self.labels))    #计算某个类别出现的概率
+    '''5、生成tf-idf'''
+    def wrd_tfidf(self,trainset):
+        self.idf = np.zeros([1,self.vocablen])      #1x词典数的矩阵
+        self.tf = np.zeros([self.doclength,self.vocablen])      #训练集文本数x词典数的矩阵
+        for index in range(self.doclength):
+            for word in trainset[index]:
+                self.tf[index,self.vocabulary.index(word)] += 1
+            '''消除不同句长导致的偏差'''
+            self.tf[index] = self.tf[index]/float(len(trainset[index]))
+            for singlewrd in set(trainset[index]):
+                self.idf[0,self.vocabulary.index(singlewrd)] += 1
+        '''idf变成权重'''
+        self.idf = np.log(float(self.doclength)/self.idf)
+        '''tf变成权重下的tf-idf'''
+        self.tf = np.multiply(self.tf,self.idf)
+        
+    '''6、生成每维值P(x|y)矩阵'''
+    def build_tdm(self):
+        self.tdm = np.zeros([len(self.Pcates),self.vocablen])       #每个类别的词频统计
+        sumlist = np.zeros([len(self.Pcates),1])        #每个类别的词频汇总
+        for index in range(self.doclength):
+            self.tdm[self.labels[index]] += self.tf[index]
+            sumlist[self.labels[index]] = np.sum(self.tdm[self.labels[index]])
+        self.tdm = self.tdm/sumlist         #生成P(x|y)最终矩阵
+    '''7、将测试集映射到当前词典中'''
+    def map2vocab(self,testdata):
+        self.testset = np.zeros([1,self.vocablen])
+        for word in testdata:
+            self.testset[0,self.vocabulary.index(word)]+=1
+    '''8、预测函数'''   
+    def predict(self,testset):
+        if np.shape(testset)[1] != self.vocablen:
+            print("输入错误")
+            exit(0)
+        else:
+            predvalue=0     #初始化类别概率
+            predcalss=""    #初始化类别名臣
+            for tdm_vect,keyclass in zip(self.tdm,self.Pcates):
+                #计算P(x|y)*P(y)
+                temp = np.sum(testset*tdm_vect*self.Pcates[keyclass])
+                if temp > predvalue:
+                    predvalue = temp
+                    predcalss = keyclass
+            return keyclass
+'''查看结果'''
+dataset,listclass = loadDataSet()
+nb = NBayes()       #实例化
+nb.train_set(dataset,listclass)
+nb.map2vocab(dataset[5])
+print(nb.predict(nb.testset))
