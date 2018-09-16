@@ -302,7 +302,7 @@ print(nb.predict(nb.testset))
 #########################################
 #                                       #
 #               推导                    #
-#算法改进                               #                          
+#算法改进                               # 
 #########################################
 '''1、定义训练集文本、类别标签'''
 def loadDataSet():
@@ -393,3 +393,76 @@ nb = NBayes()       #实例化
 nb.train_set(dataset,listclass)
 nb.map2vocab(dataset[5])
 print(nb.predict(nb.testset))
+
+
+#########################################
+#                                       #
+#        分类算法：KNN                  #
+#                                      # 
+#########################################
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import operator
+
+def createDataSet():
+    group=np.array([[1.0,1.1],[1.0,1.0],[0,0],[0,0.1]])
+    labels=['A','A','B','B']
+    return group,labels
+dataset,label = createDataSet()
+'''绘图'''
+fig=plt.figure()
+ax = fig.add_subplot(111)
+index=0
+'''加入点'''
+for point in dataset:
+    if label[index]=="A":
+        ax.scatter(point[0],point[1],c='blue',marker='o',linewidths=0,s=300)
+        plt.annotate("("+str(point[0])+","+str(point[1])+")", xy=(point[0],point[1]))
+    else:
+        ax.scatter(point[0],point[1],c='red',marker='^',linewidths=0,s=300)
+        plt.annotate("("+str(point[0])+","+str(point[1])+")", xy=(point[0],point[1]))
+    index+=1
+'''新加入一个点'''
+testdata=[0.2,0.2]
+ax.scatter(testdata[0],testdata[1],c='green',marker='^',linewidths=0,s=300)
+plt.annotate("("+str(testdata[0])+","+str(testdata[1])+")", xy=(testdata[0],testdata[1]))
+'''展示图'''
+plt.show()
+
+'''1、导入库'''
+import os
+import numpy as np
+import operator
+nb = NBayes()
+'''2、构造夹角余弦公式'''
+def cosdist(v1,v2):
+    return np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
+'''3、KNN实现分类器'''
+def classify(testdata,trainset,listclass,k):
+    datasetsize = trainset.shape[0]     #训练集矩阵行数
+    distances = np.zeros(datasetsize)
+    for index in range(datasetsize):
+        distances[index]=cosdist(testdata,trainset[index])      #计算向量间的距离
+    sortdist = np.argsort(-distances)   #倒序排列索引，因为夹角余弦越大越接近
+    classcount={}
+    for i in range(k):
+        votelabel = listclass[sortdist[i]]
+        classcount[votelabel]=classcount.get(votelabel,0) + 1   #获取标签，没有的标签默认为0
+    '''对分类字典按照value值重新排序'''
+    sortclasscount = sorted(classcount.items(),key=operator.itemgetter(1),reverse=True)     #根据第2个阈值来降序排列
+    return sortclasscount[0][0]
+'''4、评估分类结果'''
+dataset,listclass=loadDataSet()
+nb=NBayes()
+nb.train_set(dataset,listclass)
+print(classify(nb.tf[3],nb.tf,listclass,3))
+'''准确率达100%'''
+
+
+
+
+
+
+
+
