@@ -283,19 +283,19 @@ class NBayes(object):
             exit(0)
         else:
             predvalue=0     #初始化类别概率
-            predcalss=""    #初始化类别名臣
+            predclass=""    #初始化类别名称
             for tdm_vect,keyclass in zip(self.tdm,self.Pcates):
                 #计算P(x|y)*P(y)
                 temp = np.sum(testset*tdm_vect*self.Pcates[keyclass])
                 if temp > predvalue:
                     predvalue = temp
-                    predcalss = keyclass
-            return keyclass
+                    predclass = keyclass
+            return predclass
 '''查看结果'''
 dataset,listclass = loadDataSet()
 nb = NBayes()       #实例化
 nb.train_set(dataset,listclass)
-nb.map2vocab(dataset[5])
+nb.map2vocab(dataset[0])
 print(nb.predict(nb.testset))
 
 
@@ -379,19 +379,19 @@ class NBayes(object):
             exit(0)
         else:
             predvalue=0     #初始化类别概率
-            predcalss=""    #初始化类别名臣
+            predclass=""    #初始化类别名臣
             for tdm_vect,keyclass in zip(self.tdm,self.Pcates):
                 #计算P(x|y)*P(y)
                 temp = np.sum(testset*tdm_vect*self.Pcates[keyclass])
                 if temp > predvalue:
                     predvalue = temp
-                    predcalss = keyclass
-            return keyclass
+                    predclass = keyclass
+            return predclass
 '''查看结果'''
 dataset,listclass = loadDataSet()
 nb = NBayes()       #实例化
 nb.train_set(dataset,listclass)
-nb.map2vocab(dataset[5])
+nb.map2vocab(dataset[1])
 print(nb.predict(nb.testset))
 
 
