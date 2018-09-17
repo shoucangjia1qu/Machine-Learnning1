@@ -173,7 +173,7 @@ nb.train_set()
 nb.map2vocab(dataset[0])
 print(nb.predict(nb.testset))
 ```
-2、直接调用scikit-learn实例
+2、直接调用scikit-learn实例(用scikit-learn直接训练简单的那个例子，看看tdm、tf、idf这些)
 ``` python
 
 
