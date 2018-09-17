@@ -175,3 +175,9 @@ print(nb.predict(nb.testset))
 ```
 2、直接调用scikit-learn实例(用scikit-learn直接训练简单的那个例子，看看tdm、tf、idf这些)
 scikit-learn的TfidfVectorizer里面的tdm好像和实际的有点差别，需要再看一下。
+找到了：
+使用TfidfTransformer默认设置，
+其计算方式为TfidfTransformer(norm='l2', use_idf=True, smooth_idf=True, sublinear_tf=False)
+具体计算idf时，(np.log((N+1)/(Nx+1))+1)
+然后，所得到的tf-idf向量通过欧几里得范数归一化：
+
