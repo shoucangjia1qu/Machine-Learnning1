@@ -174,7 +174,4 @@ nb.map2vocab(dataset[0])
 print(nb.predict(nb.testset))
 ```
 2、直接调用scikit-learn实例(用scikit-learn直接训练简单的那个例子，看看tdm、tf、idf这些)
-``` python
-
-
-```
+scikit-learn的TfidfVectorizer里面的tdm好像和实际的有点差别，需要再看一下。
