@@ -19,12 +19,12 @@ train,classv=loadDataSet()
 from sklearn import feature_extraction
 from sklearn.feature_extraction.text import TfidfTransformer    #TF-IDF向量转换类
 from sklearn.feature_extraction.text import TfidfVectorizer     #TF-IDF向量生成类
-vectorizer = TfidfVectorizer( sublinear_tf=True)
+vectorizer = TfidfVectorizer()
 transformer = TfidfTransformer()    #统计每个词语的TF-IDF权重
 tdm = vectorizer.fit_transform(train)
 tvocabulary = vectorizer.vocabulary_
 
-vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.5,
+vectorizer = TfidfVectorizer(sublinear_tf=False, max_df=0.5,
                              vocabulary=tvocabulary)
 transformer = TfidfTransformer()    #统计每个词语的TF-IDF权重
 testtdm = vectorizer.fit_transform(train)
@@ -211,10 +211,123 @@ nb.train_set(dataset,listclass)
 print(classify(nb.tf[3],nb.tf,listclass,3))
 '''准确率达100%'''
 
+#########################################
+#                                       #
+#        特征提取                       #
+#                                      # 
+#########################################
+'''1、字典特征提取'''
+'''分类特征是“属性值”对，其中该值被限制为
+不排序的可能性的离散列表（例如，主题标识符，对象类型，标签，名称...）'''
+from sklearn.feature_extraction import DictVectorizer
+#分类属性+数字特征的提取
+measurements = [
+    {'city': 'Dubai', 'temperature': 33.},
+    {'city': 'London', 'temperature': 12.},
+    {'city': 'San Fransisco', 'temperature': 18.},
+ ]
+vec = DictVectorizer()      #模型
+fea=vec.fit_transform(measurements)     #训练
+fea.toarray()
+vec.vocabulary_             #输出字典
+vec.get_feature_names()     #输出列表
+#转换为稀疏二维矩阵，相当于get_dummies
+measurements = [
+    {'city': 'Dubai', 'temperature': 'high'},
+    {'city': 'Dubai', 'temperature': 'low'},
+    {'city': 'Dubai', 'temperature': 'low', 'geo':'east'}
+
+ ]
+vec = DictVectorizer()      #模型
+fea=vec.fit_transform(measurements)     #训练
+fea.toarray()
+vec.vocabulary_             #输出字典
+vec.get_feature_names()     #输出列表
 
 
 
+'''2、文本特征提取'''
+'''2-1统计词频和正则化切词，生成TF'''
+from sklearn.feature_extraction.text import CountVectorizer
+data=['my dog has flea problems help please',
+                 'maybe not take him to dog park stupid',
+                 'my dalmation is so cute I love him my',
+                 'stop posting stupid worthless garbage',
+                 'mr licks ate my steak how to stop him',
+                 'quit buying worthless dog food stupid']
+vec = CountVectorizer(min_df=1)
+x=vec.fit_transform(data)
+x.toarray()
+vec.vocabulary_             #输出字典
+vec.get_feature_names()     #输出列表
+#切分句子，使用默认区分块。token_pattern的正则
+'''
+CountVectorizer(analyzer='word', binary=False, decode_error='strict',
+        dtype=<class 'numpy.int64'>, encoding='utf-8', input='content',
+        lowercase=True, max_df=1.0, max_features=None, min_df=1,
+        ngram_range=(1, 1), preprocessor=None, stop_words=None,
+        strip_accents=None, token_pattern='(?u)\\b\\w\\w+\\b',
+        tokenizer=None, vocabulary=None)
+'''
+analyze=CountVectorizer(min_df=1).build_analyzer()
+analyze('你好,下午好!今天天气不错.')
+#['你好', '下午好', '今天天气不错']
+'''自定义矢量化器类'''
+def my_tokenizer(s):
+    return s.split()
+vectorizer = CountVectorizer(tokenizer=my_tokenizer)
+vectorizer.build_analyzer()(u"Some... punctuation!")
+#['some...', 'punctuation!']
+
+'''2-2TF-IDF权重计算'''
+from sklearn.feature_extraction.text import TfidfTransformer
+transformer = TfidfTransformer(smooth_idf=False)        #非默认参数
+'''
+TfidfTransformer(norm='l2', smooth_idf=False, sublinear_tf=False,
+         use_idf=True)
+'''
+count=x.toarray()
+tfidf=transformer.fit_transform(count)      #L2范数标准化
+tfidf.toarray()
+
+'''2-3结合TF，TF-IDF功能的模型'''
+from sklearn.feature_extraction.text import TfidfVectorizer     #TF-IDF向量生成类
+vec=TfidfVectorizer()
+x=vec.fit_transform(data)
+x.toarray()
+vec.vocabulary_             #输出字典
+vec.get_feature_names()     #输出列表
 
 
+'''3、hash值映射'''
+from sklearn.feature_extraction.text import HashingVectorizer
+hv = HashingVectorizer(n_features=10)       #哈希函数-1到1，但是解释性不强
+hv.fit_transform(data).toarray()
+'''
+    一般来说，只要词汇表的特征不至于太大，大到内存不够用，肯定是使用一般意义的向量化比较好。
+因为向量化的方法解释性很强，我们知道每一维特征对应哪一个词，进而我们还可以使用TF-IDF对
+各个词特征的权重修改，进一步完善特征的表示。
+    而Hash Trick用大规模机器学习上，此时我们的词汇量极大，使用向量化方法内存不够用，而使用
+Hash Trick降维速度很快，降维后的特征仍然可以帮我们完成后续的分类和聚类工作。当然由于分布
+式计算框架的存在，其实一般我们不会出现内存不够的情况。因此，实际工作中我使用的都是特征向量化。
+'''
 
+def hashing_vectorizer(features, N):
+     x = N * [0]
+     for f in features:
+         h = hash(f)
+         idx = h % N
+         x[idx] += 1
+     return x
+ 
+ hashing_vectorizer(["cat","dog","cat"],4)   
+    
+    
+    
+if f == 'cat':
 
+    hash(f) = 1
+
+elif f == 'dog':
+
+    hash(f) = 2
