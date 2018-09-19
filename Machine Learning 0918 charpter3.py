@@ -31,7 +31,30 @@ Po = o/(y+e+o)
 G_age = E_cate - (Py*E_y + Pe*E_e + Po*E_o)
 '''G_age=0.2666969558634843'''
 
+'''ID3算法实现'''
+import numpy as np
+import math, copy, pickle
 
+class ID3Tree(object):
+    '''1、初始化'''
+    def __init__(self):         #构造方法
+        self.tree={}            #生成树
+        self.dataset=[]         #数据集
+        self.labels=[]          #标签集
+        
+    '''2、数据导入函数'''
+    def loadDataSet(self,path,labels):
+        datalist=[]
+        with open(path,"rb") as f:          #二进制形式读取文件
+            content=f.read()
+            rows = content.splitlines()     #分割文本，按行转换为一维表
+            datalist=[row.split("\t") for row in rows if row.strip()]  #用制表符分割每个样本的变量值
+            self.dataset = datalist
+            self.labels = labels
+    '''3、执行决策树函数'''
+    def train(self):
+        labels = copy.deepcopy(self.labels)     #深度复制lebels，相当于备份
+        self.tree = self.buildTree(self,dataset,labels)
 
 
 
