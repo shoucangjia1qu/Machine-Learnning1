@@ -35,6 +35,7 @@ G_age = E_cate - (Py*E_y + Pe*E_e + Po*E_o)
 import numpy as np
 import math, copy, pickle
 
+'''定义类'''
 class ID3Tree(object):
     '''1、初始化'''
     def __init__(self):         #构造方法
@@ -56,10 +57,75 @@ class ID3Tree(object):
         labels = copy.deepcopy(self.labels)     #深度复制lebels，相当于备份
         self.tree = self.buildTree(self,dataset,labels)
 
+    '''4、创建决策树主程序'''
+    def buildTree(self,dataset,labels):
+        catelist=[data[-1] for data in dataset]     #抽取数据源标签列
+        '''程序终止，只有一种分类标签'''
+        if catelist.count(catelist[0]) == len(catelist):
+            return catelist[0]
+        '''只有一个变量，无法再分'''
+        if len(dataset[0])==1:
+            return self.maxCate(catelist)
+        '''算法核心：返回最优特征轴'''
+        bestfeat = self.getBestFeat(self,dataset)
+        bestfeatlabel = labels[bestfeat]
+        tree={bestfeatlabel:()}
+        del labels[bestfeat]
+        '''抽取最优特征轴的列向量'''
+        uniqueVals = set([data[bestfeat] for data in dataset])      #特征轴的值
+        for value in uniqueVals:
+            sublabels=label[:]
+            splitdata = self.splitdateset(dateset,bestfeat,value)
+            subTree = self.buildTree(splitdata,sublabels)
+            tree[bestfeatlabel][value]=subTree
+        return tree
+    
+    '''5、计算出现次数最多的类别标签'''
+    def maxCate(self,catelist):
+        items = dict([(i, catelist.count(i),) for i in catelist])    
+        maxc = list(items.keys())[list(items.values()).count(max(list(items.values())))]
+        return maxc
 
+    '''6、计算最优特征'''
+    def getBestFeat(self,dataset):
+        numFeatures = len(dataset[0]-1)     #计算特征维
+        baseEntropy = self.computeEntropy(dataset)      #计算信息熵，基础的
+        bestgain=0          #初始化信息增益
+        bestFeature = -1    #初始化最优特征轴
+        for x in range(numFeatures):
+            uniqueVals = set([data[x] for data in dataset])
+            newEntropy=0
+            for value in uniqueVals:
+                subdataset = self.splitdataset(dataset,i,value)     #切分数据集，取出需要计算的部分
+                pro = len(subdataset)/len(dataset)
+                newEntropy += pro*self.computeEntropy(subdataset)
+            gain = baseEntropy - newEntropy         #计算最大增益
+            if gain>bestgain:
+                bestgain = gain
+                bestFeature = x
+        return  bestFeature
+    
+    '''7、计算信息熵'''
+    def computeEntropy(self.dataset):
+        cates = [i for i in dataset[-1]]
+        datalen = len(dataset)
+        items = dict([(cate, cates.count(cate)) for cate in cates])
+        for key in items.keys():
+            pro = float(items[key])/datalen
+            Entropy = -pro*np.log2(pro)
+        return Entropy
+    
+    '''8、划分数据集'''
+    def splitdateset(self,dataset,axis,value):
+        rtnlist=[]
+        for data in dataset:
+            if data[axis]==value:
+                rtndata=data[:axis]
+                rtndata.extend(data[axis+1:])
+                rtnlist.append(rtndata)
+        return rtnlist
 
-
-
+'''训练树'''
 
 
 
