@@ -5,7 +5,7 @@ Created on Wed Aug 29 22:27:40 2018
 @author: ecupl
 """
 
-###################决策树##################
+###################决策树ID3算法##################
 '''1、了解算法ID3——信息增益'''
 import numpy as np
 '''计算分类别信息熵'''
@@ -46,16 +46,17 @@ class ID3Tree(object):
     '''2、数据导入函数'''
     def loadDataSet(self,path,labels):
         datalist=[]
-        with open(path,"rb") as f:          #二进制形式读取文件
+        with open(path,"r") as f:          #二进制形式读取文件
             content=f.read()
-            rows = content.splitlines()     #分割文本，按行转换为一维表
-            datalist=[row.split("\t") for row in rows if row.strip()]  #用制表符分割每个样本的变量值
-            self.dataset = datalist
-            self.labels = labels
+        rows = content.splitlines()     #分割文本，按行转换为一维表
+        datalist=[row.split("\t") for row in rows if row.strip()]  #用制表符分割每个样本的变量值
+        self.dataset = datalist
+        self.labels = labels
     '''3、执行决策树函数'''
     def train(self):
         labels = copy.deepcopy(self.labels)     #深度复制lebels，相当于备份
-        self.tree = self.buildTree(self,dataset,labels)
+        
+        self.tree = self.buildTree(self.dataset,labels)
 
     '''4、创建决策树主程序'''
     def buildTree(self,dataset,labels):
@@ -67,15 +68,15 @@ class ID3Tree(object):
         if len(dataset[0])==1:
             return self.maxCate(catelist)
         '''算法核心：返回最优特征轴'''
-        bestfeat = self.getBestFeat(self,dataset)
+        bestfeat = self.getBestFeat(dataset)
         bestfeatlabel = labels[bestfeat]
-        tree={bestfeatlabel:()}
+        tree={bestfeatlabel:{}}
         del labels[bestfeat]
         '''抽取最优特征轴的列向量'''
         uniqueVals = set([data[bestfeat] for data in dataset])      #特征轴的值
         for value in uniqueVals:
-            sublabels=label[:]
-            splitdata = self.splitdateset(dateset,bestfeat,value)
+            sublabels=labels[:]
+            splitdata = self.splitdataset(dataset,bestfeat,value)
             subTree = self.buildTree(splitdata,sublabels)
             tree[bestfeatlabel][value]=subTree
         return tree
@@ -88,7 +89,7 @@ class ID3Tree(object):
 
     '''6、计算最优特征'''
     def getBestFeat(self,dataset):
-        numFeatures = len(dataset[0]-1)     #计算特征维
+        numFeatures = len(dataset[0])-1    #计算特征维
         baseEntropy = self.computeEntropy(dataset)      #计算信息熵，基础的
         bestgain=0          #初始化信息增益
         bestFeature = -1    #初始化最优特征轴
@@ -96,7 +97,7 @@ class ID3Tree(object):
             uniqueVals = set([data[x] for data in dataset])
             newEntropy=0
             for value in uniqueVals:
-                subdataset = self.splitdataset(dataset,i,value)     #切分数据集，取出需要计算的部分
+                subdataset = self.splitdataset(dataset,x,value)     #切分数据集，取出需要计算的部分
                 pro = len(subdataset)/len(dataset)
                 newEntropy += pro*self.computeEntropy(subdataset)
             gain = baseEntropy - newEntropy         #计算最大增益
@@ -106,17 +107,18 @@ class ID3Tree(object):
         return  bestFeature
     
     '''7、计算信息熵'''
-    def computeEntropy(self.dataset):
-        cates = [i for i in dataset[-1]]
+    def computeEntropy(self,dataset):
+        cates = [i[-1] for i in dataset]
         datalen = len(dataset)
         items = dict([(cate, cates.count(cate)) for cate in cates])
+        Entropy=0
         for key in items.keys():
             pro = float(items[key])/datalen
-            Entropy = -pro*np.log2(pro)
+            Entropy -=pro*np.log2(pro)
         return Entropy
     
     '''8、划分数据集'''
-    def splitdateset(self,dataset,axis,value):
+    def splitdataset(self,dataset,axis,value):
         rtnlist=[]
         for data in dataset:
             if data[axis]==value:
@@ -124,15 +126,196 @@ class ID3Tree(object):
                 rtndata.extend(data[axis+1:])
                 rtnlist.append(rtndata)
         return rtnlist
+    
+    '''9、持久化决策树——储存树'''
+    def storeTree(self,inputTree,filename):
+        with open(filename,'w') as file:
+            pickle.dump(inputTree,file)
+    
+    '''10、读取树'''
+    def loadTree(self,filename):
+        with open(filename,'r') as file:
+            fr=pickle.load(file)
+        return fr
+    '''11、决策树预测'''
+    def predict(self,inputTree,featLabels,testVec):
+        felist=list(inputTree.keys())        #寻找树根节点的特征
+        root=felist[0]
+        secondDict=inputTree[root]      #树根节点对应的判断值或者是子结构
+        rootIndex = featLabels.index(root)      #树根节点的位置index
+        key = testVec[rootIndex]        #测试集数据在树根节点特征轴上的值
+        subtree = secondDict[key]       #根据测试集的值所对应的结果
+        '''判断subroot是树结构还是值'''
+        if isinstance(subtree,dict):
+            testlabel = self.predict(subtree,featLabels,testVec)    #递归分类
+        else:
+            testlabel = subtree
+        return testlabel
+        
 
 '''训练树'''
+dtree =ID3Tree()
+dtree.loadDataSet(r"D:\mywork\test\ML\dataset_ID3.dat",['age','revenue','student','credit'])
+dtree.train()
+print(dtree.tree)
+
+'''储存和读取树'''
+dtree.storeTree(str(dtree.tree),'data.tree')
+mytree=dtree.loadTree('data.tree')
+print(mytree)
+
+'''决策树分类预测'''
+dtree = ID3Tree()       #实例化
+labels=['age','revenue','student','credit']
+testdata=['0','1','0','0']
+mytree = dtree.loadDataSet('data.tree')
+print(dtree.predict(mytree,labels,testdata))
 
 
+###################决策树C4.5算法##################
+import numpy as np
+import math, copy, pickle
 
+'''定义类'''
+class C45Tree(object):
+    '''1、初始化'''
+    def __init__(self):         #构造方法
+        self.tree={}            #生成树
+        self.dataset=[]         #数据集
+        self.labels=[]          #标签集
+        
+    '''2、数据导入函数'''
+    def loadDataSet(self,path,labels):
+        datalist=[]
+        with open(path,"r") as f:          #二进制形式读取文件
+            content=f.read()
+        rows = content.splitlines()     #分割文本，按行转换为一维表
+        datalist=[row.split("\t") for row in rows if row.strip()]  #用制表符分割每个样本的变量值
+        self.dataset = datalist
+        self.labels = labels
+    '''3、执行决策树函数'''
+    def train(self):
+        labels = copy.deepcopy(self.labels)     #深度复制lebels，相当于备份
+        
+        self.tree = self.buildTree(self.dataset,labels)
 
+    '''4、创建决策树主程序'''
+    def buildTree(self,dataset,labels):
+        catelist=[data[-1] for data in dataset]     #抽取数据源标签列
+        '''程序终止，只有一种分类标签'''
+        if catelist.count(catelist[0]) == len(catelist):
+            return catelist[0]
+        '''只有一个变量，无法再分'''
+        if len(dataset[0])==1:
+            return self.maxCate(catelist)
+        '''算法核心：返回最优特征轴'''
+        bestfeat, bestfeatvalue = self.getBestFeat(dataset)
+        bestfeatlabel = labels[bestfeat]
+        tree={bestfeatlabel:{}}
+        del labels[bestfeat]
+        '''抽取最优特征轴的列向量'''
+        for value in bestfeatvalue:
+            sublabels=labels[:]
+            splitdata = self.splitdataset(dataset,bestfeat,value)
+            subTree = self.buildTree(splitdata,sublabels)
+            tree[bestfeatlabel][value]=subTree
+        return tree
+    
+    '''5、计算出现次数最多的类别标签'''
+    def maxCate(self,catelist):
+        items = dict([(i, catelist.count(i),) for i in catelist])    
+        maxc = list(items.keys())[list(items.values()).count(max(list(items.values())))]
+        return maxc
 
+    '''6、计算最优特征'''
+    def getBestFeat(self,dataset):
+        numFeatures = len(dataset[0])-1    #计算特征维
+        totality = len(dataset)     #数据集数量
+        baseEntropy = self.computeEntropy(dataset)      #计算信息熵，基础的
+        conditionEntropy=[]     #初始化条件熵
+        slpitInfo = []          #特征轴基础熵
+        allFeatVList = []       #特征轴数值的子集
+        bestgain=0          #初始化信息增益
+        for x in range(numFeatures):
+            featList=[data[x] for data in dataset]      #取出特征列的值
+            [split,featureValueList] = self.computeSplitInfo(featList)      #特征轴基础熵，和特征轴数值的子集
+            allFeatVList.append(featureValueList)
+            slpitInfo.append(split)
+            newEntropy=0
+            for value in featureValueList:
+                subdataset = self.splitdataset(dataset,x,value)     #切分数据集，取出需要计算的部分
+                pro = len(subdataset)/float(totality)
+                newEntropy += pro*self.computeEntropy(subdataset)
+            conditionEntropy.append(newEntropy)     #各个特征轴的条件熵
+        gain=baseEntropy*np.ones(numFeatures) - np.array(conditionEntropy)  #ID3信息增益数组
+        gainRatio = gain/np.array(slpitInfo)        #C4.5信息增益率数组
+        bestFeatureIndex = np.argsort(-gainRatio)[0]   #将增益率的Index从大到小排序，并选取最大的Index
+        bestFeatureValue = allFeatVList[bestFeatureIndex]   #信息增益率最大的所有特征值
+        return bestFeatureIndex,bestFeatureValue
+    
+    '''7、计算信息熵'''
+    def computeEntropy(self,dataset):
+        cates = [i[-1] for i in dataset]
+        datalen = len(dataset)
+        items = dict([(cate, cates.count(cate)) for cate in cates])
+        Entropy=0
+        for key in items.keys():
+            pro = float(items[key])/datalen
+            Entropy -=pro*np.log2(pro)
+        return Entropy
+    
+    '''8、计算特征轴的基础熵'''
+    def computeSplitInfo(self,featureList):
+        nums = len(featureList)
+        valuenums = list(set(featureList))
+        valuecounts = [featureList.count(value) for value in valuenums]
+        prolist = [float(valuecount)/nums for valuecount in valuecounts]
+        Elist = [pro*np.log2(pro) for pro in prolist]
+        splitInfo = -np.sum(Elist)      #返回特征轴基础熵
+        return splitInfo,valuenums    #返回特征轴、特征值的子集（去重）
+    
+    '''9、划分数据集'''
+    def splitdataset(self,dataset,axis,value):
+        rtnlist=[]
+        for data in dataset:
+            if data[axis]==value:
+                rtndata=data[:axis]
+                rtndata.extend(data[axis+1:])
+                rtnlist.append(rtndata)
+        return rtnlist
+    
+    '''10、持久化决策树——储存树'''
+    def storeTree(self,inputTree,filename):
+        with open(filename,'w') as file:
+            pickle.dump(inputTree,file)
+    
+    '''11、读取树'''
+    def loadTree(self,filename):
+        with open(filename,'r') as file:
+            fr=pickle.load(file)
+        return fr
+    '''12、决策树预测'''
+    def predict(self,inputTree,featLabels,testVec):
+        felist=list(inputTree.keys())        #寻找树根节点的特征
+        root=felist[0]
+        secondDict=inputTree[root]      #树根节点对应的判断值或者是子结构
+        rootIndex = featLabels.index(root)      #树根节点的位置index
+        key = testVec[rootIndex]        #测试集数据在树根节点特征轴上的值
+        subtree = secondDict[key]       #根据测试集的值所对应的结果
+        '''判断subroot是树结构还是值'''
+        if isinstance(subtree,dict):
+            testlabel = self.predict(subtree,featLabels,testVec)    #递归分类
+        else:
+            testlabel = subtree
+        return testlabel
 
+'''训练数据集'''
+dtree=C45Tree()
+dtree.loadDataSet(r"D:\mywork\test\ML\dataset_ID3.dat",['age','revenue','student','credit'])
+dtree.train()
 
-
-
+'''测试数据'''
+mytree=dtree.tree
+re=dtree.predict(mytree,['age','revenue','student','credit'],['0','1','0','0'])
+print(re)
 
