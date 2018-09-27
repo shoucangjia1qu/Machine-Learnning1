@@ -319,3 +319,100 @@ mytree=dtree.tree
 re=dtree.predict(mytree,['age','revenue','student','credit'],['0','1','0','0'])
 print(re)
 
+
+###################Scikit-learn与回归树##################
+'''cart树选择最优分隔点'''
+#leafType:叶子节点线性回归函数
+#errType:最小剩余方差实现函数
+#ops:允许的方差下降值，最小切分样本数
+def getBestFeat(dataSet, leafType=regLeaf, errType=regErr, ops=(1,4)):
+    tolS = ops[0]                           #允许的方差下降值
+    tolN = ops[1]                           #最小切分样本数
+    '''---算法终止条件1开始---'''
+    splitdataSet = set(dataSet[:,-1].T.tolist()[0])
+    if splitdataSet == 1:                   #只有一个观测值？？？
+        return None, leafType(dataSet)
+    '''计算最优划分方差、划分列、划分值'''
+    m,n = dataSet.shape()                   #数据集的行和列
+    S = errType(dataSet)                    #数据集的总体方差
+    bestS = np.inf                          #初始化最优方差
+    bestIndex = -1                          #初始化最优列
+    bestValue = 0                           #初始化最优值
+    for index in range(n-1):                #遍历变量
+        for value in set(dataSet[:,index]): #遍历变量的值
+            mat0,mat1 = binSplit(dataSet, index, value) #二元划分数据集，函数
+            '''判断是否小于最小叶节点个数'''
+            if mat0.shape[0]<tolN or mat1.shape[0]<tolN:
+                continue
+            newS = errType(mat0) + errType(mat1)
+            if newS < bestS:
+                bestS = newS
+                bestIndex = index
+                bestValue = value
+    
+    '''---算法终止条件2开始：返回的是值节点类型---'''
+    if (S-bestS)<tolS:
+        return None,leafType(dataSet)
+    
+    '''---算法终止条件3开始：最小叶节点个数小于指定值'''
+    mat0,mat1 = binSplit(dataSet, index, value) #二元划分数据集，函数
+    '''判断是否小于最小叶节点个数'''
+    if mat0.shape[0]<tolN or mat1.shape[0]<tolN:
+        return None,leafType(dataSet)
+    
+    '''---算法终止条件4：返回子树节点类型，还需继续递归回归'''
+    return bestIndex, bestValue
+    
+'''二元划分数据集函数'''    
+def binSplit(dataSet, index, value):
+    mat0 = dataSet[dataSet[:,index]>value,:]
+    mat1 = dataSet[dataSet[:,index]<=value,:]
+    return mat0,mat1
+
+'''剪枝策略'''
+def prune(tree, testData):
+    '''没有测试集输入，运行getMean，程序退出'''
+    if testData.shape[0] == 0:
+        return getMean(tree)
+
+'''Scikit-learn案例'''
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.tree import DecisionTreeRegressor
+'''1、数据可视化函数'''
+def plotfig(x,xtest,y,yp):
+    plt.figure()
+    plt.scatter(x,y,c='k',label='data')
+    plt.plot(xtest,yp,c='r',label='max_depth=5',linewidth=2)
+    plt.xlabel('data')
+    plt.ylabel('target')
+    plt.title("Decision Tree Regression")
+    plt.legend()
+    plt.show()
+    
+'''2、执行决策树'''
+x=np.linspace(-5,5,200)
+siny = np.sin(x)
+y=siny+np.random.rand(1,len(siny))*1.5
+#将X转换为二维进行训练
+x=np.mat(x).T
+y=y.tolist()[0]
+clf = DecisionTreeRegressor(max_depth=4)
+clf.fit(x,y)
+#预测新数据
+xtest=np.arange(-5,5,0.05)[:,np.newaxis]
+yn=clf.predict(xtest)
+#将数据转换为一维画图
+X=[x[i,0] for i in range(len(x))]
+Xtest=[xtest[i,0] for i in range(len(xtest))]
+plotfig(X,Xtest,y,yn)
+
+
+
+
+
+
+
+
+
+
