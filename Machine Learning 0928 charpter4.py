@@ -48,6 +48,45 @@ for label in set(labels):
     n+=1
 plt.show()
 
+'''基于用户的推荐(User CF)'''
+import numpy as np
+import operator
+
+#夹角余弦距离公式
+def cosDist(v1,v2):
+    dist = np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
+    return dist
+#KNN算法
+def KNN(testData,trainSet,listClass,k):
+    x,y = trainSet.shape
+    distList = np.zeros(x)      #初始化
+    for index in range(x):
+        distList[index] = cosDist(testData,trainSet[index])
+    indexList = np.argsort(-distList)        #降序排列后的标签列表
+    voteDict = dict()       #初始化投票
+    for i in range(k):
+        voteLabel = listClass[indexList[i]]
+        voteDict[voteLabel] = voteDict.get(voteLabel,0) + 1
+    sortVote = sorted(voteDict.items(),key=operator.itemgetter(1),reverse=True)     #根据第2个阈值来降序排列
+    return sortVote[0][0]
+
+dataMat=np.array([[0.238,0,0.1905,0.1905,0.1905,0.1905],
+               [0,0.177,0,0.294,0.235,0.294],
+               [0.2,0.16,0.12,0.12,0.2,0.2]])
+testSet=[0.2174,0.2174,0.1304,0,0.2174,0.2174]
+classLabel=np.array(['B','C','D'])
+reClass = KNN(testSet,dataMat,classLabel,3)     #D
+
+
+
+
+
+
+
+
+
+
+
     
 
     
