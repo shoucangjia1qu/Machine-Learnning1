@@ -78,15 +78,37 @@ classLabel=np.array(['B','C','D'])
 reClass = KNN(testSet,dataMat,classLabel,3)     #D
 
 
+'''基于产品的推荐Item CF'''
+import numpy as np
+import operator
+
+#夹角余弦距离公式
+def cosDist(v1,v2):
+    dist = np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
+    return dist
+#KNN算法
+def KNN_item(testData,trainSet,labelList,k):
+    length = trainSet.shape[0]
+    distList = np.zeros(length)     #初始化距离列表
+    for index in range(length):
+        distList[index] = cosDist(testData,trainSet[index])
+    indexList = np.argsort(-distList)
+    voteDict = dict()
+    for i in range(k):
+        voteLabel = labelList[indexList[i]]
+        voteDict[voteLabel] = voteDict.get(voteLabel,0) + 1
+    sortVote = sorted(voteDict.items(), key=operator.itemgetter(1),reverse=True)
+    return sortVote[0][0]
+
+dataSet = np.array([[0.417,0,0.25,0.333],
+                    [0.3,0.4,0,0.3],
+                    [0,0,0.625,0.375],
+                    [0.278,0.222,0.222,0.278],
+                    [0.263,0.211,0.263,0.263]
+        ])
+testData = [0.334,0.333,0,0.333]
+labelList = ['B','C','D','E','F']
+result = KNN_item(testData,dataSet,labelList,3)
 
 
 
-
-
-
-
-
-
-    
-
-    
