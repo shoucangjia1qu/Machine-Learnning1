@@ -110,5 +110,107 @@ testData = [0.334,0.333,0,0.333]
 labelList = ['B','C','D','E','F']
 result = KNN_item(testData,dataSet,labelList,3)
 
+'''SVD计算用户和产品特征'''
+import numpy as np
 
+'''定义夹角余弦公式'''
+def cosDist(v1,v2):
+    dist = np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
+    return dist
+
+'''SVD分解高维矩阵'''
+data = np.array([
+        [5,5,3,0,5,5],
+        [5,0,4,0,4,4],
+        [0,3,0,5,4,5],
+        [5,4,3,3,5,5],
+        ])                  #U*I
+dataNow = data.T            #I*U
+U,Sigma,VT = np.linalg.svd(dataNow)
+#Sigma百分比>=90%，故K选2
+k=2
+#选取前两个奇异值
+Sigmak = np.diag(Sigma)[:k,:k]
+#训练集产品特征向量
+Uk = U[:,:k]
+#训练集用户特征向量
+Vk = VT[:k,:].T
+'''根据矩阵转变特征(U和V是正交矩阵，Sigma是对角矩阵)
+    M = U*Sigma*Vt
+    Mt = V*Sigma*Ut
+    Mt*U*Sigma(-1) = V
+    M*V*Sigma(-1) = U'''
+testData=np.mat([[5],[5],[0],[0],[0],[5]])          #测试集用户
+#测试集用户特征向量
+Vtest = testData.T*Uk*np.linalg.inv(Sigmak)
+'''或者'''
+testData1=np.array([[5],[5],[0],[0],[0],[5]])          #测试集用户
+Vtest1 = np.dot(np.dot(testData.T,Uk),np.linalg.inv(Sigmak))
+'''夹角余弦计算相似度'''
+maxV = 0
+maxI = 0
+index = 0
+for i in Vk:
+    tempValue = cosDist(i,np.array(Vtest)[0])
+    if tempValue>maxV:
+        maxV = tempValue
+        maxI = index
+    index+=1
+print("相似度：{}".format(maxV))
+print("和用户{}最相似".format(maxI))
+
+'''直接用U表示用户特征，SVD分解高维矩阵'''
+data = np.array([
+        [5,5,3,0,5,5],
+        [5,0,4,0,4,4],
+        [0,3,0,5,4,5],
+        [5,4,3,3,5,5],
+        ])                  #U*I
+U,Sigma,VT = np.linalg.svd(data)
+#Sigma百分比>=90%，故K选2
+k=2
+#选取前两个奇异值
+Sigmak = np.diag(Sigma)[:k,:k]
+#训练集用户特征向量
+Uk = U[:,:k]
+#训练集产品特征向量
+Vk = VT[:k,:].T
+'''根据矩阵转变特征(U和V是正交矩阵，Sigma是对角矩阵)
+    M = U*Sigma*Vt
+    Mt = V*Sigma*Ut
+    Mt*U*Sigma(-1) = V
+    M*V*Sigma(-1) = U'''
+testData=np.mat([[5,5,0,0,0,5]])          #测试集用户
+#测试集用户特征向量
+Utest = testData*Vk*np.linalg.inv(Sigmak)
+'''或者'''
+testData1=np.array([[5],[5],[0],[0],[0],[5]])          #测试集用户
+Vtest1 = np.dot(np.dot(testData.T,Uk),np.linalg.inv(Sigmak))
+'''夹角余弦计算相似度'''
+maxV = 0
+maxI = 0
+index = 0
+for i in Uk:
+    tempValue = cosDist(i,np.array(Utest)[0])
+    if tempValue>maxV:
+        maxV = tempValue
+        maxI = index
+    index+=1
+print("相似度：{}".format(maxV))
+print("和用户{}最相似".format(maxI))
+###结果一样的
+
+'''下面想讲一下数组、矩阵中np.dot,np.multiply,*的用法'''
+import numpy as np
+A = np.arange(0,4).reshape(2,2)
+B = np.arange(1,5).reshape(2,2)
+#np.dot，数组和矩阵都是当作矩阵的乘法来处理，点乘
+np.dot(A,B)
+np.dot(np.mat(A),np.mat(B))
+#np.multiply，数组和矩阵都是对应位置相乘
+np.multiply(A,B)
+np.multiply(np.mat(A),np.mat(B))
+#*，数组是对应位置相乘，矩阵是点乘
+A*B
+np.mat(A)*np.mat(B)
 
