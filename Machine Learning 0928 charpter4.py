@@ -118,7 +118,7 @@ def cosDist(v1,v2):
     dist = np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
     return dist
 
-'''SVD分解高维矩阵'''
+###################SVD分解高维矩阵##################
 data = np.array([
         [5,5,3,0,5,5],
         [5,0,4,0,4,4],
@@ -213,4 +213,97 @@ np.multiply(np.mat(A),np.mat(B))
 #*，数组是对应位置相乘，矩阵是点乘
 A*B
 np.mat(A)*np.mat(B)
+
+###################k-means聚类实现##################
+import numpy as np
+
+class Kmeans(object):
+    '''初始化'''
+    def __init__(self):
+        self.CluPoint = 0      #初始化族群的中心点
+        self.CluNumber = 0      #初始化族群个数
+        self.dataSet = 0        #初始化数据集
+        self.labels = 0        #初始化分类标签
+        self.dist = 0         #初始化数据点到中心的位置
+        
+    '''读取数据函数'''
+    def loadData(self,path):
+        recordList = []
+        with open(path,'r') as f:
+            content = f.readlines()
+        recordList=[row.split() for row in content]
+        x,y=np.shape(recordList)
+        dataSet=np.zeros((x,y))    #初始化矩阵
+        for i in range(x):
+            for j in range(y):
+                dataSet[i][j] = float(recordList[i][j])
+        self.dataSet = dataSet
+        
+    '''定义欧氏距离公式'''
+    def Edist(self,v1,v2):
+        return (np.linalg.norm(v1-v2))
+    
+    '''随机生成初始聚类中心'''
+    def randCluPoint(self,dataSet,k):
+        x,y = np.shape(dataSet)
+        CluPts = np.zeros((k,y))        #初始化随机中心点
+        for i in range(y):
+            maxv = np.max(dataSet[:,i])
+            minv = np.min(dataSet[:,i])
+            for j in range(k):
+                CluPts[j,i] = minv + np.random.rand()*(maxv-minv)
+        return CluPts
+    
+    '''聚类主函数'''
+    def KM(self,dataSet,k):
+        self.CluNumber = k
+        Label = np.zeros(len(dataSet))      #初始化每个数据的标签
+        Dist = np.zeros(len(dataSet))       #初始化每个数据的距离
+        centerPoints = self.randCluPoint(dataSet,self.CluNumber)     #随机生成初始中心点
+        flag = True
+        while flag:
+            flag = False
+            '''求每个点到每个聚类中心的位置'''
+            for i in range(len(dataSet)):
+                distList = []
+                distList = [self.Edist(dataSet[i,:],centerPoints[j,:]) for j in range(k)]
+                minDist = np.min(distList)      #最短距离
+                minIndex = distList.index(minDist)      #最短距离的类
+                '''判定当前数据点的最小距离和分类是否一致'''
+                if Label[i] != minIndex:
+                    flag = True
+                Label[i] = minIndex
+                Dist[i] = minDist
+            '''迭代中心位置，每列的平均值'''
+            for cent in range(k):
+                newData = dataSet[np.nonzero(Label==cent)[0]]       #定位不同类别数据点的下标
+                centerPoints[cent,:] = np.mean(newData, axis=0)
+        self.labels = Label
+        self.dist = Dist
+        self.CluPoint = centerPoints
+
+#运行函数
+Km = Kmeans()
+Km.loadData("D:\\mywork\\test\\ML\\4k2_far_data.txt")
+trainData = Km.dataSet[:,1:]
+Km.KM(trainData,4)
+labels = Km.labels
+#画图
+import matplotlib.pyplot as plt
+x = list(trainData[:,0])
+y = list(trainData[:,1])
+markers = ['o','^','+','d']
+colors = ['r','y','b','g']
+n = 0
+plt.figure()
+for label in set(labels):
+    x1 = []
+    y1 = []
+    for i in range(len(labels)):
+        if labels[i]==label:
+            x1.append(x[i])
+            y1.append(y[i])
+    plt.scatter(x1,y1,marker=markers[n],color=colors[n])
+    n+=1
+plt.show()
 
