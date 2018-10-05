@@ -216,6 +216,7 @@ np.mat(A)*np.mat(B)
 
 ###################k-means聚类实现##################
 import numpy as np
+import copy
 
 class Kmeans(object):
     '''初始化'''
@@ -306,4 +307,124 @@ for label in set(labels):
     plt.scatter(x1,y1,marker=markers[n],color=colors[n])
     n+=1
 plt.show()
+
+###################二分k-means聚类实现##################
+Km=Kmeans()
+Km.loadData("D:\\mywork\\test\\ML\\4k2_far_data.txt")
+trainData = Km.dataSet[:,1:]
+k=4
+#初始化中心点
+point0 = np.mean(trainData,axis=0)
+#聚类中心点集合
+cPts = []
+cPts.append(point0.tolist())
+#计算数据点到初始中心的距离
+CluLabel = np.zeros(len(trainData))
+CluDist = np.zeros(len(trainData))
+for p in range(len(trainData)):
+    CluDist[p] = Km.Edist(cPts[0],trainData[p])
+#达到规定聚类点数量就停止划分
+while (len(cPts)<k):
+    SSE = np.inf
+    for i in range(len(cPts)):
+        '''需要划分的临时数据集'''
+        tempData = trainData[np.nonzero(CluLabel==i)[0]]
+        '''进行二分类划分'''
+        Km.KM(tempData,2)
+        tempLabels = Km.labels
+        tempDist = Km.dist
+        tempCent = Km.CluPoint
+        '''划分后数据集的误差'''
+        splitSSE = np.sum(tempDist)
+        '''不在划分数据集范围内的误差'''
+        nonsplitSSE = np.sum(CluDist[np.nonzero(CluLabel != i)[0]])
+        '''选取总体误差最小的划分集，也就是寻找最需要划分的数据集'''
+        if splitSSE + nonsplitSSE < SSE:
+            #重新赋值总体误差，以寻求更小的总体误差
+            SSE = splitSSE + nonsplitSSE
+            bestCent = tempCent
+            bestSplitPts = i
+            bestDist = copy.deepcopy(tempDist)
+            bestLabels = copy.deepcopy(tempLabels)
+    '''替换原先的聚类中心点、标签、距离'''
+    #先定义需要替换的下标
+    replaceIndex = np.nonzero(CluLabel == bestSplitPts)[0]
+    #替换分类标签和最短距离
+    for j in range(len(bestLabels)):
+        CluDist[replaceIndex[j]] = bestDist[j]
+        if bestLabels[j] == 0:
+            CluLabel[replaceIndex[j]] = bestSplitPts
+        else:
+            CluLabel[replaceIndex[j]] = len(cPts)
+    #替换聚类中心点
+    cPts[bestSplitPts] = bestCent.tolist()[0]
+    cPts.append(bestCent.tolist()[1])
+        
+#画图
+import matplotlib.pyplot as plt
+x = list(trainData[:,0])
+y = list(trainData[:,1])
+markers = ['o','^','+','d','h','+']
+colors = ['r','y','b','g','g','r']
+n = 0
+plt.figure()
+for label in set(CluLabel):
+    x1 = []
+    y1 = []
+    for i in range(len(CluLabel)):
+        if CluLabel[i]==label:
+            x1.append(x[i])
+            y1.append(y[i])
+    plt.scatter(x1,y1,marker=markers[n],color=colors[n])
+    n+=1
+plt.show()
+
+###################SVD详解##################
+'''手工算出U、Sigma、V'''
+A=np.mat([[5,5,3,0,5,5],[5,0,4,0,4,4],[0,3,0,5,4,5],[5,4,3,3,5,5]])
+lamda,hU = np.linalg.eig(A*A.T)
+lamda1,hV = np.linalg.eig(A.T*A)
+Sigma = np.sqrt(lamda)
+'''numpy算'''
+U,S,V=np.linalg.svd(A)
+'''SVD简易推荐系统'''
+import numpy as np
+
+trainSet=np.array([[0,0,0,0,0,4,0,0,0,0,5],[0,0,0,3,0,4,0,0,0,0,3],
+				[0,0,0,0,4,0,0,1,0,4,0],[3,3,4,0,0,0,0,2,2,0,0],
+				[5,4,5,0,0,0,0,5,5,0,0],[0,0,0,0,5,0,1,0,0,5,0],
+				[4,3,4,0,0,0,0,5,5,0,1],[0,0,0,4,0,4,0,0,0,0,4],
+				[0,0,0,2,0,2,5,0,0,1,2],[0,0,0,0,5,0,0,0,0,4,0]])
+testSet=np.array([[1,0,0,0,0,0,0,1,2,0,0]])
+eps = 1.0e-6
+
+def cosDist(v1,v2):
+    Dist=(np.dot(v1,v2))/(np.linalg.norm(v1)*np.linalg.norm(v2)+eps)
+    return Dist
+U,S,Vt = np.linalg.svd(trainSet)
+'''求解奇异值数量
+m = 0
+for i in S:
+    m+=i**2
+n=0
+for i in S:
+    n+=i**2
+    if n/m>=0.9:
+        break
+'''
+k=3
+Uk = U[:,:k]
+Sigma = np.diag(S)[:k,:k]
+Vtk = Vt[:k,:]
+#得出测试集新坐标
+testU = np.dot(np.dot(testSet[0],Vtk.T),np.linalg.inv(Sigma))
+#计算所有夹角余弦
+Dists = np.array([cosDist(testU,i) for i in Uk])
+#从大到小把下标排序
+DistsIndex = np.argsort(-Dists)
+mostLike = trainSet[DistsIndex[0]]
+mostPre = Dists[DistsIndex[0]]
+print("相似度最高：{}。推荐{}".format(mostPre,mostLike))
+
+
 
