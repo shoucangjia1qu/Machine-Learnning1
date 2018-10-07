@@ -72,14 +72,62 @@ for i in range(steps):
     Wt = W0 + alpha*np.dot(X.T,(Y-O))       #计算误差
     W0 = Wt
 
+###################线性感知器##################
+import numpy as np
+import matplotlib.pyplot as plt
 
-
-
-
-
-
-
-
+'''准备数据集'''
+with open(r"D:\mywork\test\ML\dataSet_BP.txt",'r') as f:
+    content=f.readlines()
+trainList = [row.split() for row in content]
+x,y=np.shape(trainList)
+trainSet=np.zeros((x,y))    #初始化矩阵
+for i in range(x):
+    for j in range(y):
+        trainSet[i][j] = float(trainList[i][j])
+train = np.array([i for i in trainSet if i[0]<=6])
+'''画图'''
+xdata1 = [i[0] for i in trainSet if i[2]==0 and i[0]<=6]
+ydata1 = [i[1] for i in trainSet if i[2]==0 and i[0]<=6]
+xdata2 = [i[0] for i in trainSet if i[2]==1 and i[0]<=6]
+ydata2 = [i[1] for i in trainSet if i[2]==1 and i[0]<=6]
+plt.figure()
+plt.scatter(xdata1,ydata1,c='r',marker='^')
+plt.scatter(xdata2,ydata2,c='b',marker='o')
+plt.show()
+'''构造线性感知器'''
+target = train[:,-1].reshape((158,1))       #标签
+trainData = np.column_stack((np.ones((158,1)),train[:,:2]))
+alpha = 0.001
+steps = 500
+W = np.ones((3,1))
+for k in range(steps):
+    gradient = np.dot(trainData,W)
+    output = 1/(1+np.exp(-gradient))
+    error = target - output
+    W = W + alpha*np.dot(trainData.T,error)
+    #画图展示变化
+    Xre = np.linspace(-6,6,100)
+    Yre = -(W[0]+Xre*W[1])/W[2]
+    xdata1 = [i[0] for i in trainSet if i[2]==0 and i[0]<=6]
+    ydata1 = [i[1] for i in trainSet if i[2]==0 and i[0]<=6]
+    xdata2 = [i[0] for i in trainSet if i[2]==1 and i[0]<=6]
+    ydata2 = [i[1] for i in trainSet if i[2]==1 and i[0]<=6]
+    plt.figure()
+    plt.scatter(xdata1,ydata1,c='r',marker='^')
+    plt.scatter(xdata2,ydata2,c='b',marker='o')
+    plt.plot(Xre,Yre)
+    plt.show()
+'''对测试集进行分类'''
+testData = np.array([[1,-4,5],[1,2,7],[1,3,-1],[1,2,0.5],[1,0,0]])
+Re = 1/(1+np.exp(-(np.dot(testData,W))))
+#测试集画图
+plt.figure()
+plt.scatter(xdata1,ydata1,c='r',marker='^')
+plt.scatter(xdata2,ydata2,c='b',marker='o')
+plt.plot(Xre,Yre)
+plt.scatter(testData[:,1],testData[:,2],c='g',marker='o',linewidths=10)
+plt.show()
 
 
 
