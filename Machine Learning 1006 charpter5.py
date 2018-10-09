@@ -129,6 +129,71 @@ plt.plot(Xre,Yre)
 plt.scatter(testData[:,1],testData[:,2],c='g',marker='o',linewidths=10)
 plt.show()
 
+###################算法分析##################
+'''评估算法的近似结果'''
+'''
+1、超平面分析
+2、斜率和截距分析：初始值的震荡
+3、权重收敛评估
+4、算法的总体评价
+'''
+'''==========超平面的变化趋势=========='''
+Wlist = []          #初始化权重列表，用来保存权重
+alpha = 0.001
+steps = 1000
+W = np.ones((3,1))
+for k in range(steps):
+    gradient = np.dot(trainData,W)
+    output = 1/(1+np.exp(-gradient))
+    error = target - output
+    W = W + alpha*np.dot(trainData.T,error)
+    Wlist.append(W)     #保存当前的权重
 
+#画图
+plt.figure()
+plt.scatter(xdata1,ydata1,c='r',marker='^')
+plt.scatter(xdata2,ydata2,c='b',marker='o')
+Xre = np.linspace(-6,6,100)
+for index in range(len(Wlist)):
+    if index%20 == 0:
+        Yre = -(Wlist[index][0]+Xre*Wlist[index][1])/Wlist[index][2]
+        plt.plot(Xre,Yre)
+        plt.annotate("hplane:"+str(index),xy=(Xre[99],Yre[99]))
+plt.show()
+'''==========超平面的收敛估计：截距的变化=========='''
+plt.figure()
+Xb=np.linspace(0,999,1000)
+Yb=[-i[0]/i[2] for i in Wlist]
+M = 50
+plt.subplot(211)
+plt.plot(Xb[:M],Yb[:M])
+plt.subplot(212)
+plt.plot(Xb[M:],Yb[M:],c='r')
+plt.show()
+'''==========超平面的收敛估计：斜率的变化=========='''
+plt.figure()
+Xa=np.linspace(0,999,1000)
+Ya=[-i[1]/i[2] for i in Wlist]
+M = 20
+plt.subplot(211)
+plt.plot(Xa[:M],Ya[:M])
+plt.subplot(212)
+plt.plot(Xa[M:],Ya[M:],c='r')
+plt.show()
+'''==========权重向量收敛估计=========='''
+plt.figure()
+Xw=np.linspace(0,999,1000)
+Yw0=[i[0] for i in Wlist]
+Yw1=[i[1] for i in Wlist]
+Yw2=[i[2] for i in Wlist]
+plt.subplot(3,1,1)
+plt.plot(Xw,Yw0)
+plt.subplot(3,1,2)
+plt.plot(Xw,Yw1,c='r')
+plt.subplot(3,1,3)
+plt.plot(Xw,Yw2,c='g')
+plt.show()
+'''再加500次迭代后收敛效果更好'''
 
+###################随机梯度下降法：算法改进与评估##################
 
