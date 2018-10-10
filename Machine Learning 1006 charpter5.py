@@ -196,4 +196,127 @@ plt.show()
 '''再加500次迭代后收敛效果更好'''
 
 ###################随机梯度下降法：算法改进与评估##################
+'''随机梯度下降法主函数'''
+import numpy as np
+import matplotlib.pyplot as plt
+
+'''1、准备数据集'''
+with open(r"D:\mywork\test\ML\dataSet_BP.txt",'r') as f:
+    content=f.readlines()
+trainList = [row.split() for row in content]
+x,y=np.shape(trainList)
+trainSet=np.zeros((x,y))    #初始化矩阵
+for i in range(x):
+    for j in range(y):
+        trainSet[i][j] = float(trainList[i][j])
+train = np.array([i for i in trainSet if i[0]<=6])
+target = train[:,-1].reshape((158,1))       #标签
+trainData = np.column_stack((np.ones((158,1)),train[:,:2]))
+
+'''2、构造线性感知器'''
+steps = 500
+W = np.ones(3)
+m,n = np.shape(trainData)
+for i in range(steps):
+    dataIndex = list(range(m))      #为数据设立索引
+    for j in range(m):
+        alpha = 2/(1+i+j)       #随机步长/学习率
+        randnum = int(np.random.uniform(0,len(dataIndex)))         #取随机数，作为索引下标
+        randIndex = dataIndex[randnum]      #选取下标对应的索引
+        gradient = np.dot(trainData[randIndex],W.T)         #求点积和梯度
+        O = 1/(1+np.exp(-gradient))
+        Error = target[randIndex] - O       #求误差
+        W = W + alpha*Error*trainData[randIndex]        #更新权重
+        del(dataIndex[randnum])       #删除下标对应的索引
+
+for i in range(steps):
+    tempData = trainData
+    tempTarget = target
+    for j in range(m):
+        alpha = 2/(1+i+j)       #随机步长/学习率
+        randIndex = int(np.random.uniform(0,len(tempData)))         #取随机索引
+        gradient = np.dot(tempData[randIndex],W.T)         #求点积和梯度
+        O = 1/(1+np.exp(-gradient))
+        Error = tempTarget[randIndex] - O       #求误差
+        W = W + alpha*Error*tempData[randIndex]        #更新权重
+        tempData=np.delete(tempData,randIndex,axis=0)        #删除随机索引对应的数据
+        tempTarget = np.delete(tempTarget,randIndex,axis=0)     #删除随机索引对应的结果
+
+
+'''3、画图'''
+Xre = np.linspace(-6,6,100)
+Yre = -(W[0]+Xre*W[1])/W[2]
+xdata1 = [i[0] for i in trainSet if i[2]==0 and i[0]<=6]
+ydata1 = [i[1] for i in trainSet if i[2]==0 and i[0]<=6]
+xdata2 = [i[0] for i in trainSet if i[2]==1 and i[0]<=6]
+ydata2 = [i[1] for i in trainSet if i[2]==1 and i[0]<=6]
+plt.figure()
+plt.scatter(xdata1,ydata1,c='r',marker='^')
+plt.scatter(xdata2,ydata2,c='b',marker='o')
+plt.plot(Xre,Yre)
+plt.show()
+
+'''4、alpha步长变化率'''
+steps = 500
+W = np.ones(3)
+m,n = np.shape(trainData)
+alpha100 = []   #第一次迭代全部样本的步长
+alpha500 = []   #所有迭代中第一个样本的步长
+for i in range(steps):
+    dataIndex = list(range(m))      #为数据设立索引
+    for j in range(m):
+        alpha = 2/(1+i+j)       #随机步长/学习率
+        randnum = int(np.random.uniform(0,len(dataIndex)))         #取随机数，作为索引下标
+        randIndex = dataIndex[randnum]      #选取下标对应的索引
+        gradient = np.dot(trainData[randIndex],W.T)         #求点积和梯度
+        O = 1/(1+np.exp(-gradient))
+        Error = target[randIndex] - O       #求误差
+        W = W + alpha*Error*trainData[randIndex]        #更新权重
+        del(dataIndex[randnum])       #删除下标对应的索引
+        '''加入步长'''
+        if i==0:
+            alpha100.append(alpha)
+        if j==0:
+            alpha500.append(alpha)
+plt.figure()
+plt.subplot(2,1,1)
+plt.plot(range(len(alpha100)),alpha100)
+plt.subplot(2,1,2)
+plt.plot(range(len(alpha500)),alpha500,c='r')
+plt.show()
+
+'''5、权重收敛评估'''
+steps = 300
+W = np.ones(3)
+m,n = np.shape(trainData)
+Wlist = []
+for i in range(steps):
+    dataIndex = list(range(m))      #为数据设立索引
+    for j in range(m):
+        alpha = 2/(1+i+j)       #随机步长/学习率
+        randnum = int(np.random.uniform(0,len(dataIndex)))         #取随机数，作为索引下标
+        randIndex = dataIndex[randnum]      #选取下标对应的索引
+        gradient = np.dot(trainData[randIndex],W.T)         #求点积和梯度
+        O = 1/(1+np.exp(-gradient))
+        Error = target[randIndex] - O       #求误差
+        W = W + alpha*Error*trainData[randIndex]        #更新权重
+        del(dataIndex[randnum])       #删除下标对应的索引
+    '''加入权重'''
+    Wlist.append(W)
+plt.figure()
+plt.subplot(2,1,1)
+plt.plot(range(len(Wlist)),[-i[0]/i[2] for i in Wlist])
+plt.subplot(2,1,2)
+plt.plot(range(len(Wlist)),[-i[1]/i[2] for i in Wlist],c='r')
+plt.show()
+
+plt.figure()
+plt.subplot(3,1,1)
+plt.plot(range(len(Wlist)),[i[0] for i in Wlist])
+plt.subplot(3,1,2)
+plt.plot(range(len(Wlist)),[i[1] for i in Wlist],c='r')
+plt.subplot(3,1,3)
+plt.plot(range(len(Wlist)),[i[2] for i in Wlist],c='g')
+plt.show()
+'''随机梯度下降法迭代200+次后，权重就趋于平稳了，见效比一般梯度下降要快。'''
 
