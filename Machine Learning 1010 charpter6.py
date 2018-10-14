@@ -16,9 +16,9 @@ class BPNet(object):
     def __init__(self):
         #人工定的参数
         self.eb = 0.01      #误差容限
-        self.r = 0.01        #学习率
+        self.r = 0.1       #学习率
         self.mc = 0.3       #栋梁因子，用以考虑上次迭代的权重的结果
-        self.max_iterator = 100000    #最大迭代次数
+        self.max_iterator = 2000    #最大迭代次数
         self.nHidden = 4    #隐含层神经元个数
         self.nOutput = 1    #输出层输出个数
         #系统迭代生成的参数
@@ -30,6 +30,7 @@ class BPNet(object):
         self.cols = 0       #训练集列数
         self.hiddenWB = 0
         self.outputWB = 0
+        self.Y = 0          #输出标签
     '''2、定义误差函数'''
     def errorfunc(self,singleError):
         return(np.sum(np.power(singleError,2))*0.5)       #0.5*Sigma((Y-O)**2)
@@ -68,7 +69,7 @@ class BPNet(object):
         m,n = np.shape(dataSet)
         for i in range(n):
             dataSet[:,i] = (dataSet[:,i]-np.mean(dataSet[:,i]))/np.std(dataSet[:,i]+1.0e-10)
-        return dataSet
+        self.dataSet = dataSet
     '''9、主函数'''
     def BPtrain(self):
         data = self.dataSet
@@ -103,9 +104,58 @@ class BPNet(object):
                 self.hiddenWB = self.hiddenWB + (1-self.mc)*self.r*np.dot(deltaH,data) + self.mc*hiddenWBold
             outWBold = np.dot(deltaO,yi_Input.T)
             hiddenWBold = np.dot(deltaH,data)
+            self.Y = y_Output
 
-bp = BPNet()       
-bp.loadData("D:\\mywork\\test\\ML\\dataSet_BP.txt")            
-bp.BPtrain()          
-bp.errorList[-1]
+#正式程序
+for now in range(100):
+    bp = BPNet()       
+    bp.loadData("D:\\mywork\\test\\ML\\dataSet_BP.txt")
+    bp.normalize(bp.dataSet)            
+    bp.BPtrain()          
+    print(bp.errorList[-1])
+    if bp.errorList[-1]<=1:
+        break
 
+    #隐含层和输出层权重
+hw = bp.hiddenWB
+ow = bp.outputWB
+#画散点图
+data = bp.dataSet
+labels = bp.Labels
+plt.figure()
+for i in range(bp.rows):
+    if labels[i] == 0:
+        plt.scatter(data[i,0],data[i,1],c='b',marker='o')
+    else:
+        plt.scatter(data[i,0],data[i,1],c='r',marker='^')
+plt.show()
+#准备画等高图
+x = np.linspace(-3,3,50)
+xx = np.ones((50,50))
+xx[:,0:50] = x
+yy=xx.T
+z=np.ones((50,50))
+for i in range(50):
+    for j in range(50):
+        tempdata = []
+        tempdata.append([xx[i,j],yy[i,j],1])    #(1,3)
+        tempdata = np.array(tempdata)
+        hi = np.dot(hw,tempdata.T)       #隐藏层求点乘积(4,1)
+        hi_Output = bp.logit(hi)              #隐藏层输出(4,1)
+        yi_Input = np.row_stack((hi_Output,np.ones((1,1))))     #多加一列b构成新的输入项(5,1)
+        yi = np.dot(ow,yi_Input)     #输出层求点乘积(1,1)
+        y_Output = bp.logit(yi)
+        z[i,j] = y_Output
+plt.figure()
+for i in range(bp.rows):
+    if labels[i] == 0:
+        plt.scatter(data[i,0],data[i,1],c='b',marker='o')
+    else:
+        plt.scatter(data[i,0],data[i,1],c='r',marker='^')
+plt.contour(x,x,z,1,colors = 'black')
+plt.show()
+
+#画误差图
+plt.figure()
+plt.plot(range(bp.max_iterator),bp.errorList,c='r')
+plt.show()
