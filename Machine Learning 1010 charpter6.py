@@ -178,7 +178,7 @@ class Kohonen(object):
         self.RoundList = []         #聚类半径列表
         self.w = []                 #权重
         self.M = 2                  #输出层节点数。MxN表示聚类数，这里是展示为2*2的二维模式
-        self.N = 2                  
+        self.N = 2                 
         self.dataSet = 0            #训练集
         self.Labels = 0             #自身聚类标签
         self.Y = 0                  #聚类结果
@@ -242,13 +242,14 @@ class Kohonen(object):
             minIndex = dataDist.index(min(dataDist))
             #minIndex = np.array([self.edist(tempData,i) for i in self.w.T]).argmin()
             '''定位输出的节点位置，并计算邻域'''
-            x = np.floor(minIndex/self.M)       #下取整
-            y = np.mod(minIndex,self.M)         #取模
+            x = np.floor(minIndex/self.N)       #下取整
+            y = np.mod(minIndex,self.N)         #取模
             leafDist = [self.edist(np.array([x,y]),b) for b in grid]
+            #leafDist = [self.edist(grid[minIndex],b) for b in grid]
             rodIndex = list((np.array(leafDist)<rod).nonzero()[0])      #得到再学习半径范围内的输出节点下标
             for d in range(self.w.shape[1]):
                 if d in rodIndex:
-                    self.w[:,d] = self.w[:,d]+rate*(mySample-self.w[:,d])
+                    self.w[:,d] = self.w[:,d]+rate*(tempData-self.w[:,d])
         '''开始分类'''
         self.Y = np.ones(m)
         for i in range(m):
@@ -261,12 +262,31 @@ class Kohonen(object):
 som = Kohonen()
 som.loadData("D:\\mywork\\test\\ML\\4k2_far_data.txt")
 som.train()
+print(som.w)
+print(som.Y)
 
-
-
-
-
-
+'''可视化'''
+newdata = np.column_stack((som.dataSet,som.Y))
+plt.figure()
+for i in set(newdata[:,2]):
+    x = newdata[(newdata[:,2]==i).nonzero()[0],0]
+    y = newdata[(newdata[:,2]==i).nonzero()[0],1]
+    if i==0:
+        plt.scatter(x,y,c='b',marker='o')
+    elif i==1:
+        plt.scatter(x,y,c='r',marker='^')
+    elif i==2:
+        plt.scatter(x,y,c='g',marker='h')
+    elif i==3:
+        plt.scatter(x,y,c='r',marker='h')
+    elif i==4:
+        plt.scatter(x,y,c='b',marker='D')
+    else:
+        plt.scatter(x,y,c='y',marker='d')
+plt.show()
+'''计算每一类的个数'''
+for i in set(newdata[:,2]):
+    print(len((newdata[:,2]==i).nonzero()[0]))
 
 
 
