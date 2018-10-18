@@ -288,6 +288,147 @@ plt.show()
 for i in set(newdata[:,2]):
     print(len((newdata[:,2]==i).nonzero()[0]))
 
+###################玻尔兹曼机##################
+import numpy as np
+import pandas as pd
+import copy
+import matplotlib.pyplot as plt
+
+'''定义玻尔兹曼网络类'''
+class BoltzmannNet(object):
+    '''1、定义属性'''
+    def __init__(self):
+        self.dataSet = 0            #数据集
+        self.Max_iter = 2000        #最大迭代次数
+        self.T0 = 1000              #初始温度
+        self.Lambda = 0.97          #降温速率
+        self.bestIter = 0           #迭代最优时的次数
+        self.dist = []              #每次迭代的距离
+        self.pathindex = []         #路径的下标
+        self.bestDist = 0           #最优距离
+        self.bestPath = []          #最优路径
+    '''2、读入数据'''
+    def loadData(self,path):
+        with open(path,"r") as f:
+            content = f.readlines()
+        self.dataSet = np.array([[float(row.strip().split()[0]),float(row.strip().split()[1])] for row in content])
+        self.signs  = [row.strip().split()[2] for row in content]
+    '''3、定义欧氏距离函数'''
+    def eDist(self,v1,v2):
+        eps = 1.0e-6
+        return(np.linalg.norm(v1-v2)+eps)
+    '''4、玻尔兹曼机函数'''
+    def boltzmann(self,deltaX,T):
+        return(np.exp(-(deltaX)/T))
+    '''5、计算路径距离'''
+    def distance(self,dist,path):
+        N = len(path)       #路径点个数
+        nowDist = 0
+        for i in range(N-1):
+            nowDist += dist[path[i],path[i+1]]      #路径点依次相加
+        nowDist += dist[path[0],path[N-1]]          #首位点相加
+        return nowDist
+    '''6、改变路径函数'''
+    def changepath(self,path):
+        N = len(path)       #路径点个数
+        '''随机产生两个位置，并交换两个位置的下标'''
+        if np.random.rand() < 0.25:
+            pots = np.floor(np.random.rand(1,2)*N)[0]
+            newpath = copy.deepcopy(path)
+            newpath[int(pots[0])] = path[int(pots[1])]
+            newpath[int(pots[1])] = path[int(pots[0])]
+        #'''整段位移相互转换'''
+        else:
+            pots = np.floor(np.random.rand(1,3)*N)[0]
+            pots.sort()
+            a = int(pots[0])
+            b = int(pots[1])
+            c = int(pots[2])
+            if a!=b and b!=c:
+                newpath = copy.deepcopy(path)
+                newpath[a:c-1] = path[b-1:c-1] + path[a:b-1]
+            else:
+                newpath = self.changepath(path)
+        return newpath
+    '''7、初始化距离'''
+    def init_bmNet(self,data):
+        M = data.shape[0]
+        path0 = list(range(M))
+        np.random.shuffle(path0)            #打乱下标
+        dist0 = self.distance(data,path0)
+        self.pathindex.append(path0)
+        self.dist.append(dist0)
+        return(self.T0,path0,dist0)        #返回初始设定温度，随机初始路径，随机初始路径距离和
+    '''8、训练主函数'''
+    def train(self):
+        m,n = self.dataSet.shape
+        '''两两相乘，形成距离矩阵'''
+        distSet = np.zeros((m,m))
+        for i in range(m):
+            for j in range(m):
+                distSet[i,j] = self.eDist(self.dataSet[i,:],self.dataSet[j,:])
+        '''首次计算距离/初始化'''
+        T, path0, dist0 = self.init_bmNet(distSet)
+        steps = 0
+        while steps<=self.Max_iter:
+            substeps = 0
+            while substeps<=m:
+                path1 = self.changepath(path0)
+                dist1 = self.distance(distSet,path1)
+                '''正常情况下：新路径距离和小于旧路径，则替代'''
+                if dist1<dist0:
+                    path0 = path1
+                    dist0 = dist1
+                    self.pathindex.append(path0)
+                    self.dist.append(dist0)
+                    self.bestIter+=1
+                #'''对于新路径距离大于旧路径的，通过退火确定是否替换'''
+                else:
+                    deltaX = dist1-dist0
+                    if np.random.rand()<self.boltzmann(deltaX,T):
+                        path0 = path1
+                        dist0 = dist1
+                        self.pathindex.append(path0)
+                        self.dist.append(dist0)
+                        self.bestIter+=1
+                substeps += 1
+            steps += 1
+            T = T*self.Lambda
+        '''取出最优路径'''
+        self.bestDist = min(self.dist)
+        self.bestPath = self.pathindex[np.argmin(self.bestDist)]
+
+'''正式计算最短路径问题'''
+bmNet = BoltzmannNet()
+path = "D:\\mywork\\test\\ML\\dataSet25_Boltzmann.txt"
+bmNet.loadData(path)
+data = bmNet.dataSet
+bmNet.train()
+'''最优解'''
+print(bmNet.bestDist)
+print(bmNet.bestPath)
+'''可视化'''
+paths = bmNet.pathindex
+dists = bmNet.dist
+iters = bmNet.bestIter
+'''路径距离变化可视化'''
+plt.figure()
+plt.plot(range(iters+1),dists)
+plt.show()
+'''最优路径可视化'''
+signs = bmNet.signs
+x = [data[i,0] for i in bestPath]
+y = [data[i,1] for i in bestPath]
+s = [signs[i] for i in bestPath]
+plt.figure()
+plt.scatter(x,y,c='r',linewidths=5)
+i=0
+for xl,yl in zip(x,y):
+    plt.annotate("%s" %s[i], xy=(xl+50,yl+50))
+    i+=1
+plt.plot(x,y,'b--')
+plt.show()
+
 
 
 
