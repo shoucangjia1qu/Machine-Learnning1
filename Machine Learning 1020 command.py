@@ -26,98 +26,108 @@ users.columns=['UserID','Gender','Age','Occupation','Zip-code']
 movies.rename(columns={0:'MovieID',1:'Title',2:'Genres'}, inplace = True)
 ratings.rename(columns={0:'UserID',1:'MovieID',2:'Rating',3:'Timestamp'}, inplace=True)
 ratings = np.array(ratings.iloc[:,0:2])
-'''切分数据集,交叉验证啊'''
-def splitData(data, M, k,seed):
-    test = []
-    train = []
-    np.random.seed(seed)
-    for user, item in data:
-        if np.random.randint(0,M) == k:
-            test.append([user,item])
-        else:
-            train.append([user,item])
-    return train,test
-train, test = splitData(ratings,8,0,1234)
-trainSet = dict()       #转换成字典，一个用户对应很多电影评分
-for i in train :
-    if i[0] not in trainSet.keys():
-        trainSet[i[0]] = [i[1]]
-    else:
-        trainSet[i[0]].append(i[1])
 
-'''基于用户的推荐算法1：夹角余弦计算用户对产品的相似度'''
-#两两用户的评分电影的交集/用户推荐产品的长度乘积,储存为array
-def UserSimilarity(train):
-    w=np.ones((len(train.keys()),len(train.keys())))
-    i = 0
-    for u in train.keys():
-        j = 0
-        for v in train.keys():
-            if u != v:
-                w[i,j] = len(set(train[u])&set(train[v]))
-                w[i,j] /= np.sqrt(len(set(train[u]))*len(set(train[v])))
-            j+=1
-        i+=1           
-    return w
-W=UserSimilarity(trainSet)
-#两两用户的评分电影的交集/用户推荐产品的长度乘积,储存为字典
-def UserSimilarity(train):
-    w=dict()
-    for u in train.keys():
-        w[u] = dict()
-        for v in train.keys():
-            if u == v:
-                continue
-            w[u][v] = len(set(train[u])&set(train[v]))/np.sqrt(len(set(train[u]))*len(set(train[v])))
-    return w
-W1=UserSimilarity(trainSet)
-
-'''基于用户的推荐算法2：夹角余弦计算用户对产品的相似度'''
-#先转换成物品的客户有哪些
-def Item_Users(train):
-    #将评过同一部电影的用户放在一起
-    Item_Users = dict()
-    for user,items in trainSet.items():
-        for i in items:
-            if i not in Item_Users.keys():
-                Item_Users[i] = set()
-            Item_Users[i].add(user)
-    #提取物品相关的客户数，以及每个用户的推荐数量
-    N = dict()
-    Ur = dict()
-    for items,users in Item_Users.items():
-        for u in users:
-            if u not in N.keys():
-                N[u] = 0
-            N[u] += 1
-            if u not in Ur:
-                Ur[u] = dict()
-            for subu in users:
-                if u==subu:
+class UserCF(object):
+    '''定义属性'''
+    def __init__(self):
+        self.train = 0
+        self.test = 0
+        self.K = 0
+        self.W = 0
+        self.rank = {}
+        self.precision = 0
+        self.recall = 0
+        self.cover = 0
+        self.popular = 0
+    '''切分数据集，以方便交叉验证'''
+    def splitData(self,data,M,m0,seed):
+        tr = {}
+        te = {}
+        np.random.seed(seed)        #使用随机种子
+        for user, item in data:
+            if random.randint(0,M) == m0:
+                if user not in te.keys():
+                    te[user] = set()
+                te[user].add(item)
+            else:
+                if user not in tr.keys():
+                    tr[user] = set()
+                tr[user].add(item)
+        self.train = tr
+        self.test = te
+    
+    '''算法1：直接求夹角余弦计算用户相似度'''
+    def UserSimilarity1(self,train):
+        w=dict()
+        for user in train.keys():
+            w[user] = dict()
+            for subuser in train.keys():
+                if user==subuser:
                     continue
-                if subu not in Ur[u]:
-                    Ur[u][subu] = 0
-                Ur[u][subu] += 1
-    W=dict()
-    for u,subu in Ur.items():
-        W[u] = dict()
-        for u1,times in subu.items():
-            W[u][u1] = times/np.sqrt(N[u]*N[u1])
-            
-W = Item_Users(trainSet)
+                w[user][subuser] = len(train[user]&train[subuser])/np.sqrt(len(train[user])*len(train[subuser]))
+    self.W = w
 
-'''对产品推荐的偏好'''
-def command(dataSet,U,W,K):
-    rank = dict()
-    having_items = dataSet[U]
-    for u , wi in sorted(W[U].items(), key=operator.itemgetter(1), reverse=True)[:K]:
-        for item in trainSet[u]:
-            if item not in having_items:
+    '''算法2：先转换为Item-Users形式，再计算User-User之间的相似度'''
+    def UserSimilarity2(self,train):
+        #转换为I_U形式
+        item_users = dict()
+        for user, items in train.items():
+            for item in items:
+                if item not in item_users.keys():
+                    item_users[item] = set()
+                item_users[item].add(user)
+        #计算U_U相似度
+        U_Itimes = dict()       #用户对应产品的数量
+        for user in train.keys():
+            U_Itimes[user] = len(train[user])
+        U_Utimes = dict()       #用户与用户之间交集个数
+        for item, users in item_users.items():
+            for u in users:
+                if u not in U_Utimes:
+                    U_Utimes[u] = dict()
+                for subuser in users:
+                    if u==subuser:
+                        continue
+                    if subuser not in U_Utimes[u].keys():
+                        U_Utimes[u][subuser] = 0
+                    U_Utimes[u][subuser] += 1
+        w=dict()
+        for user,item in U_Utimes.items():
+            w[user] = dict()
+            for subuser,times in item.items():
+                w[user][subuser] = times/np.sqrt(U_Itimes[user]*U_Itimes[subuser])
+        self.W = w
+    
+    '''产品推荐'''
+    def command(self,train,User,W,K):
+        self.K = K
+        rank = dict()
+        having_items = train[User]
+        for u, wi in sorted(W[User].items(), key=operator.itemgetter(1), reverse=True)[:K]:
+            for item in train[u]:
+                if item in having_items:
+                    continue
                 if item not in rank.keys():
                     rank[item] = 0
                 rank[item] += wi*1.0
-    return rank
-        
+        return rank
+    '''计算召回率'''
+    def Recall(self,train,test,K):
+        hitcommand = 0
+        allcommand = 0
+        for u in train.keys():
+            testcommand = test[u]
+            allcommand += len(testcommand)
+            rank = self.command(train,u,self.W,K)
+            for item, pui in rank.items():
+                if item in testcommand:
+                    hitcommand +=1
+        self.recall = hitcommand/(allcommand*1.0)
+        print (hitcommand/(allcommand*1.0))
+    
+                
+                    
+    
 
 
 
