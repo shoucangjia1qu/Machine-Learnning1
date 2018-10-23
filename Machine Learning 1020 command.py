@@ -30,15 +30,17 @@ ratings = np.array(ratings.iloc[:,0:2])
 class UserCF(object):
     '''定义属性'''
     def __init__(self):
-        self.train = 0
-        self.test = 0
-        self.K = 0
-        self.W = 0
-        self.rank = {}
-        self.precision = 0
-        self.recall = 0
-        self.cover = 0
-        self.popular = 0
+        self.topN = 0                   #推荐前N个产品
+        self.train = 0                  #训练集
+        self.test = 0                   #测试集
+        self.K = 0                      #选择相邻数
+        self.W = 0                      #用户相似度
+        self.rank = {}                  #推荐产品清单
+        '''评测指标'''
+        self.precision = 0              #准确率
+        self.recall = 0                 #召回率
+        self.cover = 0                  #覆盖率
+        self.popular = 0                #流行度
     '''切分数据集，以方便交叉验证'''
     def splitData(self,data,M,m0,seed):
         tr = {}
@@ -65,7 +67,7 @@ class UserCF(object):
                 if user==subuser:
                     continue
                 w[user][subuser] = len(train[user]&train[subuser])/np.sqrt(len(train[user])*len(train[subuser]))
-    self.W = w
+        self.W = w
 
     '''算法2：先转换为Item-Users形式，再计算User-User之间的相似度'''
     def UserSimilarity2(self,train):
@@ -98,9 +100,34 @@ class UserCF(object):
                 w[user][subuser] = times/np.sqrt(U_Itimes[user]*U_Itimes[subuser])
         self.W = w
     
+    '''算法3：先转换成User-Item矩阵，再计算相似度'''
+    def UserSimilarity3(self,ratings):
+        #转换成U_I矩阵
+        Items = list(set(ratings[:,1]))
+        Users = list(set(ratings[:,0]))
+        User_Item = np.zeros((len(Users),len(Items)))
+        for i,j in ratings:
+            U1 = Users.index(i)
+            I1 = Items.index(j)
+            User_Item[U1,I1] = 1
+        #计算用户相似度，用矩阵形式
+        w=np.ones((len(User_Item),len(User_Item)))
+        for u in range(len(User_Item)):
+            for v in range(len(User_Item)):
+                if u ==v:
+                    continue
+                w[u][v] = np.dot(User_Item[u,:],User_Item[v,:])/np.sqrt((User_Item[u,:].sum()*User_Item[v,:].sum()))
+        #计算用户相似度，用字典形式
+        w=dict()
+        for u in range(len(User_Item)):
+            w[Users[u]] = dict()
+            for v in range(len(User_Item)):
+                if u==v:
+                    continue
+                w[Users[u]][Items[v]] = np.dot(User_Item[u,:],User_Item[v,:])/np.sqrt((User_Item[u,:].sum()*User_Item[v,:].sum()))
+                
     '''产品推荐'''
     def command(self,train,User,W,K):
-        self.K = K
         rank = dict()
         having_items = train[User]
         for u, wi in sorted(W[User].items(), key=operator.itemgetter(1), reverse=True)[:K]:
@@ -111,29 +138,63 @@ class UserCF(object):
                     rank[item] = 0
                 rank[item] += wi*1.0
         return rank
-    '''计算召回率'''
-    def Recall(self,train,test,K):
-        hitcommand = 0
-        allcommand = 0
+    '''计算评价指标'''
+    def PandR(self,train,test,K,topN):
+        NoUser = 0
+        hit = 0                     #命中数量
+        alltest = 0                 #测试集中的数量
+        allcommand = 0              #所有推荐数量
+        self.topN = topN
+        self.K = K
+        allItems = set()            #所有物品集合
+        commandItems = set()        #所有推荐物品集合
+        allPopular = dict()         #所有物品流行度
+        avgPopular = 0              #推荐物品平均流行度
+        '''先计算所有物品集合和流行度'''
         for u in train.keys():
-            testcommand = test[u]
-            allcommand += len(testcommand)
-            rank = self.command(train,u,self.W,K)
-            for item, pui in rank.items():
-                if item in testcommand:
-                    hitcommand +=1
-        self.recall = hitcommand/(allcommand*1.0)
-        print (hitcommand/(allcommand*1.0))
-    
-                
-                    
-    
+            for item in train[u]:
+                allItems.add(item)
+                if item not in allPopular.keys():
+                    allPopular[item] = 0
+                allPopular[item] += 1
+        '''正式计算四项评测指标：准确率、召回率、覆盖率、流行度'''
+        for u in train.keys():
+            try:
+                testcommand = test[u]
+                alltest += len(testcommand)
+                rank = sorted(self.command(train,u,self.W,self.K).items(), key=operator.itemgetter(1), reverse=True)[:topN]
+                for item, pui in rank:
+                    if item in testcommand:
+                        hit +=1
+                    commandItems.add(item)
+                    avgPopular += np.log(1+allPopular[item])
+                    allcommand += 1
+            except:
+                NoUser += 1
+        self.recall = hit/(alltest*1.0)
+        self.precision = hit/(allcommand*1.0)
+        print ('recall:{},precision:{}'.format(self.recall,self.precision))
+        self.cover = len(commandItems)/len(allItems)
+        self.popular = avgPopular/(len(testSet.keys())*topN)
+        print ('cover:{},popular:{}'.format(self.cover,self.popular))
 
-
-
-
-
-
+'''正式程序'''
+Ucf = UserCF()
+#区分数据集
+Ucf.splitData(ratings,8,0,1234)
+trainSet = Ucf.train
+testSet = Ucf.test
+#计算用户相似度和耗时(因为第一种算法保留了相似度为0的用户，第二种去除了，所以两者在选取推荐用户时排序问题有差异)
+import time
+start = time.clock()
+Ucf.UserSimilarity2(trainSet)
+end = time.clock()
+print(end - start)
+wi = Ucf.W
+#计算推荐的准确率和召回率
+Ucf.PandR(trainSet,testSet,80,10)
+'''recall:0.12151931220325933,precision:0.25236508994004'''
+'''cover:0.20010816657652786,popular:7.289074374222468'''
 
 
 
