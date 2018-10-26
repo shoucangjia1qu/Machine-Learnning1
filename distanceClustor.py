@@ -15,6 +15,7 @@ from urllib.request import urlopen, quote
 import requests
 import ast
 from bs4 import BeautifulSoup
+import copy
 
 os.chdir(r'D:\mywork\test')
 
@@ -94,8 +95,7 @@ class disClustor(object):
             '''继续迭代，删除上一轮迭代圈中的点'''
             dataDist = np.delete(dataDist,bestIndexList,axis=0)
             dataDist = np.delete(dataDist,bestIndexList,axis=1)
-            for j in bestIndexList:
-                del train[j]
+            train = np.delete(train,bestIndexList,axis=0)
         
 
 
@@ -138,7 +138,7 @@ location.reset_index(drop=True,inplace=True)
 location.to_csv("ccbcstsite.csv")
 '''3-2读取位置信息'''
 location = pd.read_csv("ccbcstsite.csv",encoding="GBK")
-point=[ i for i in zip(location['lng'],location['lat'])]
+point=np.array(location.iloc[:,1:3])
 
 
 '''4、函数实例化，并进行训练，得到业务所需数据集'''
@@ -150,43 +150,23 @@ pointNumber = dc.pointNumber
 circlePoints = dc.circlePoints
 
 
-cps=dc.centerPoint
-cpvaluelist = list(cps.values())
-cpkeylist = list(cps.keys())
-'''对象持久化'''
+'''5、对象持久化'''
+cpData = dict()
+for i in range(len(centerPoints)):
+    cpData[i] = dict()
+    cpData[i]['point'] = centerPoints[i].tolist()
+    cpData[i]['quantity'] = pointNumber[i]
+    cpData[i]['avgdist'] = sum(circleDists[i])/(len(circleDists[i])-1)
+#按圈内点数量倒序排列
 import pickle
 curpath=os.getcwd()
 with open(curpath+"\\centerPoint.dat","wb") as obj:
-    pickle.dump(cps,obj)
-'''中心点导出到excel，将地址信息补全''' 
-num=[i.get('roundNum') for i in cpvaluelist]
-avgdist=[i.get('roundDist') for i in cpvaluelist]
-lng=[i[0] for i in cpkeylist]
-lat=[i[1] for i in cpkeylist]
-df = pd.DataFrame({'lng':lng,'lat':lat,'num':num,'avgdist':avgdist})
-df2=pd.merge(df, location, on=('lng','lat'), how='left')   
-df2.drop_duplicates(subset=['lng','lat'],inplace=True)
-df2.reset_index(drop=True,inplace=True)
-df2.to_csv("centerPoints.csv")
-'''圈内点'''
-roundPoints=[i.get('roundPoints') for i in cpvaluelist]
-allpts=pd.DataFrame()
-for i in range(len(avgdist)):
-    for j in roundPoints[i]:
-        address=df2.adr[i]
-        allpts=allpts.append([[address,j[0],j[1]]])
-allpts=allpts.rename(columns={0:'center',1:'lng',2:'lat'})
-location.drop_duplicates(subset=['lng','lat','adr'],inplace=True)
-allpts=pd.merge(allpts, location, on=('lng','lat'), how='left')   
-allpts.to_csv("allpts.csv")
+    pickle.dump(cpData,obj)
 
-'''读取对象'''
+
+'''6、读取对象'''
 with open(curpath+"\\centerPoint.dat","rb") as f:
     cps=pickle.load(f)
-
-with open("D:\\mywork\\test\\location\\CCB\\tbl2.json","r") as f:
-    data=f.readlines()
-
 
 
 
