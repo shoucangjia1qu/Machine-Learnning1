@@ -177,6 +177,38 @@ class UserCF(object):
         self.cover = len(commandItems)/len(allItems)
         self.popular = avgPopular/(len(testSet.keys())*topN)
         print ('cover:{},popular:{}'.format(self.cover,self.popular))
+    #####################################################################
+    '''改进后算法，UserCF-IIF'''
+    def UserSimilarityIIF(self,train):
+        item_user = dict()
+        for user, items in train.items():
+            for item in items:
+                if item not in item_user.keys():
+                    item_user[item] = set()
+                item_user[item].add(user)
+        
+        U_Itimes = dict()
+        for user,items in train.items():
+            U_Itimes[user] = len(items)
+        U_Utimes = dict()
+        for item, users in item_user.items():
+            for u in users:
+                if u not in U_Utimes.keys():
+                    U_Utimes[u] = dict()
+                for subu in users:
+                    if u==subu:
+                        continue
+                    if subu not in U_Utimes[u].keys():
+                        U_Utimes[u][subu] = 0
+                    U_Utimes[u][subu] += 1/np.log(1+len(users))
+        
+        W = dict()
+        for u, subus in U_Utimes.items():
+            W[u] = dict()
+            for v,times in subus.items():
+                W[u][v] = times/np.sqrt(U_Itimes[u]*U_Itimes[v])
+        self.W = W
+                
 
 '''正式程序'''
 Ucf = UserCF()
@@ -191,13 +223,21 @@ Ucf.UserSimilarity2(trainSet)
 end = time.clock()
 print(end - start)
 wi = Ucf.W
-#计算推荐的准确率和召回率
+
 Ucf.PandR(trainSet,testSet,80,10)
 '''recall:0.12151931220325933,precision:0.25236508994004'''
 '''cover:0.20010816657652786,popular:7.289074374222468'''
 
-
-
+#计算用户相似度UserCF_IIF
+import time
+start = time.clock()
+Ucf.UserSimilarityIIF(trainSet)
+end = time.clock()
+print(end - start)
+wiif = Ucf.W
+#计算推荐的准确率和召回率
+'''recall:0.12193635313743102,precision:0.2532311792138574'''
+'''cover:0.20930232558139536,popular:7.25838399476049'''
 
 
 
