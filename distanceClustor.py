@@ -16,8 +16,10 @@ import requests
 import ast
 from bs4 import BeautifulSoup
 import copy
+import pickle
 
 os.chdir(r'D:\mywork\test')
+curpath=os.getcwd()
 
 
 #构造算法类，最密集点聚类
@@ -97,9 +99,115 @@ class disClustor(object):
             dataDist = np.delete(dataDist,bestIndexList,axis=1)
             train = np.delete(train,bestIndexList,axis=0)
         
+#构造Boltzmann机，模拟退火算法规划最优路径
+class Boltzmann(object):
+    '''构造属性'''
+    def __init__(self):
+        self.T0 = 1000               #初始温度
+        self.r = 0.97                #退火系数
+        self.maxIter = 2000          #最大迭代次数
+        self.dataSet = 0             #数据集
+        self.distMa = 0              #距离矩阵
+        self.pathList = []           #每次迭代的路径列表
+        self.distList = []           #每次迭代的总距离
+        self.bestIter = 0            #最优迭代次数
+        self.bestPath = []           #最优路径
+        self.bestDist = []           #最优路径的距离
+    
+    '''两点之间球面距离公式'''
+    def cirdist(self,v1,v2):
+        rlng1,rlat1,rlng2,rlat2 = map(radians,[v1[0],v1[1],v2[0],v2[1]])
+        dlng = rlng2-rlng1
+        dlat = rlat2-rlat1
+        a = sin(dlat/2)**2 + cos(rlat1)*cos(rlat2)*sin(dlng/2)**2
+        c = 2*asin(sqrt(a))
+        r = 6371
+        return(c*r*1000)
+    
+    '''玻尔兹曼系数'''
+    def boltz(self,dist1,dist0,T):
+        return(np.exp(-(dist1-dist0)/T))        #逻辑回归函数x<0
+    
+    '''计算当前位次的距离和'''
+    def allDists(self,distMatrix,pathIndex):
+        distance = 0
+        n = len(pathIndex)
+        for i in range(n-1):
+            distance += distMatrix[pathIndex[i],pathIndex[i+1]]
+        distance += distMatrix[pathIndex[0],pathIndex[n-1]]
+        return distance
+    
+    '''调换路径下标'''
+    def changeIndex(self,pathIndex):
+        N = len(pathIndex)
+        '''要么两两对调'''
+        if np.random.rand() < 0.25:
+            points = np.floor(np.random.rand(2)*N)      #下取整
+            newpathIndex = copy.deepcopy(pathIndex)
+            newpathIndex[int(points[0])] = pathIndex[int(points[1])]
+            newpathIndex[int(points[1])] = pathIndex[int(points[0])]
+        else:
+            '''整段位移互换'''
+            points = np.floor(np.random.rand(3)*N)
+            points.sort()
+            a = int(points[0])
+            b = int(points[1])
+            c = int(points[2])
+            if a!=b and b!=c:
+                newpathIndex = copy.deepcopy(pathIndex)
+                newpathIndex[a:c+1] = pathIndex[b:c+1] + pathIndex[a:b]
+            else:
+                newpathIndex = self.changeIndex(pathIndex)
+        return newpathIndex
+            
+    
+    '''训练函数'''
+    def train(self,data):
+        self.train = data
+        #计算距离矩阵
+        m=data.shape[0]
+        distMatrix = np.zeros((m,m))
+        for i in range(m):
+            for j in range(m):
+                if i==j:
+                    continue
+                distMatrix[i,j] = self.cirdist(data[i,:],data[j,:])
+        self.distMa = distMatrix
+        #初始化距离
+        pathIndex0 = list(range(m))
+        np.random.shuffle(pathIndex0)
+        dist0 = self.allDists(distMatrix,pathIndex0)
+        #开始循环迭代
+        T = self.T0
+        steps = 0
+        while steps < self.maxIter:
+            substep = 0
+            while substep<m:
+                pathIndex1 = self.changeIndex(pathIndex0)
+                dist1 = self.allDists(distMatrix,pathIndex1)
+                if dist1<dist0:
+                    dist0 = dist1
+                    pathIndex0 = pathIndex1
+                    self.pathList.append(pathIndex0)
+                    self.distList.append(dist0)
+                    self.bestIter += 1
+                else:
+                    if np.random.rand()<self.boltz(dist1,dist0,T):
+                        dist0 = dist1
+                        pathIndex0 = pathIndex1
+                        self.pathList.append(pathIndex0)
+                        self.distList.append(dist0)
+                        self.bestIter += 1
+                substep += 1
+            steps += 1
+            T = T*self.r
+        self.bestDist = min(self.distList)
+        self.bestPath = self.pathList[np.argmin(self.distList)]
+    
 
 
 ######################正式程序##############################
+'''第一部分：聚类找到高端圈'''
 '''1、爬取位置信息-构造函数'''
 def getlatlng1(address):
     url = 'http://api.map.baidu.com/geocoder/v2/'
@@ -143,7 +251,7 @@ point=np.array(location.iloc[:,1:3])
 
 '''4、函数实例化，并进行训练，得到业务所需数据集'''
 dc=disClustor()
-dc.train(point,500)
+dc.train(point[:2000],500)
 centerPoints = dc.centerPoint
 circleDists = dc.circleDists
 pointNumber = dc.pointNumber
@@ -158,8 +266,6 @@ for i in range(len(centerPoints)):
     cpData[i]['quantity'] = pointNumber[i]
     cpData[i]['avgdist'] = sum(circleDists[i])/(len(circleDists[i])-1)
 #按圈内点数量倒序排列
-import pickle
-curpath=os.getcwd()
 with open(curpath+"\\centerPoint.dat","wb") as obj:
     pickle.dump(cpData,obj)
 
@@ -168,7 +274,38 @@ with open(curpath+"\\centerPoint.dat","wb") as obj:
 with open(curpath+"\\centerPoint.dat","rb") as f:
     cps=pickle.load(f)
 
+'''第二部分：找到目标客户'''
 
+
+
+
+
+'''第三部分：对目标客户规划最短路径'''
+'''8、对圈内目标客户进行最短路径规划'''
+bm = Boltzmann()
+dataSet = np.array(circlePoints[0])
+bm.train(dataSet)       #需要输入array格式
+print(bm.bestIter)      #最短路径迭代次数
+print(bm.bestDist)      #最短路径距离
+print(bm.bestPath)      #最短路径下标
+
+'''路径距离变化可视化'''
+dists = bm.distList
+plt.figure()
+plt.plot(range(len(dists)),dists)
+plt.show()
+'''最优路径可视化，经纬度差异不大，故扩大了100倍'''
+bestPath = bm.bestPath
+x = [dataSet[i,0]*100 for i in bestPath]
+y = [dataSet[i,1]*100 for i in bestPath]
+plt.figure()
+plt.scatter(x,y,c='r',linewidths=5)
+plt.plot(x,y,'b--')
+i = 0
+for xl,yl in zip(x,y):
+    plt.annotate("{}".format(bestPath[i]), xy=(xl,yl))
+    i += 1
+plt.show()
 
 
 
