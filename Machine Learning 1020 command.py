@@ -140,7 +140,6 @@ class UserCF(object):
         return rank
     '''计算评价指标'''
     def PandR(self,train,test,K,topN):
-        NoUser = 0
         hit = 0                     #命中数量
         alltest = 0                 #测试集中的数量
         allcommand = 0              #所有推荐数量
@@ -158,19 +157,16 @@ class UserCF(object):
                     allPopular[item] = 0
                 allPopular[item] += 1
         '''正式计算四项评测指标：准确率、召回率、覆盖率、流行度'''
-        for u in train.keys():
-            try:
-                testcommand = test[u]
-                alltest += len(testcommand)
-                rank = sorted(self.command(train,u,self.W,self.K).items(), key=operator.itemgetter(1), reverse=True)[:topN]
-                for item, pui in rank:
-                    if item in testcommand:
-                        hit +=1
-                    commandItems.add(item)
-                    avgPopular += np.log(1+allPopular[item])
-                    allcommand += 1
-            except:
-                NoUser += 1
+        for u in test.keys():
+            testcommand = test[u]
+            alltest += len(testcommand)
+            rank = sorted(self.command(train,u,self.W,self.K).items(), key=operator.itemgetter(1), reverse=True)[:topN]
+            for item, pui in rank:
+                if item in testcommand:
+                    hit +=1
+                commandItems.add(item)
+                avgPopular += np.log(1+allPopular[item])
+                allcommand += 1
         self.recall = hit/(alltest*1.0)
         self.precision = hit/(allcommand*1.0)
         print ('recall:{},precision:{}'.format(self.recall,self.precision))
@@ -216,7 +212,7 @@ Ucf = UserCF()
 Ucf.splitData(ratings,8,0,1234)
 trainSet = Ucf.train
 testSet = Ucf.test
-#计算用户相似度和耗时(因为第一种算法保留了相似度为0的用户，第二种去除了，所以两者在选取推荐用户时排序问题有差异)
+###要点###计算用户相似度和耗时(因为第一种算法保留了相似度为0的用户，第二种去除了，所以两者在选取推荐用户时排序问题有差异)
 import time
 start = time.clock()
 Ucf.UserSimilarity2(trainSet)
@@ -239,12 +235,133 @@ wiif = Ucf.W
 '''recall:0.12193635313743102,precision:0.2532311792138574'''
 '''cover:0.20930232558139536,popular:7.25838399476049'''
 
+######################################
+#                                    #
+#            ItemCF算法              #
+#                                    #
+######################################
 
+'''计算相似度'''
+def ItemSimilarity(train):
+    I_times = dict()            #统计每个物品出现的次数
+    I_Itimes = dict()           #统计物品与物品之间被几个用户喜欢
+    for user, items in train.items():
+        for item in items:
+            if item not in I_Itimes.keys():
+                I_Itimes[item] = dict()
+                I_times[item] = 0
+            I_times[item] += 1
+            for subitem in items:
+                if item == subitem:
+                    continue
+                if subitem not in I_Itimes[item].keys():
+                    I_Itimes[item][subitem] = 0
+                I_Itimes[item][subitem] += 1
+    
+    W = dict()                  #物品之间的相似度
+    for item, others in I_Itimes.items():
+        W[item] = dict()
+        for subitem, times in others.items():
+            W[item][subitem] = times/np.sqrt(I_times[item]*I_times[subitem])
 
+'''基于物品相似度的推荐'''                
+def command(train,U,W,K):
+    rank = dict()
+    havingItems = train[U]
+    for item in havingItems:
+        for commandItem, wi in sorted(W[item].items(),key=operator.itemgetter(1), reverse=True)[:K]:
+            if commandItem in havingItems:
+                continue
+            if commandItem not in rank.keys():
+                rank[commandItem] = 0
+            rank[commandItem] += 1*wi
+    return rank
 
+'''基于物品相似度的推荐，加上解释度'''                
+def command(train,U,W,K):
+    rank = dict()
+    reason = dict()
+    havingItems = train[U]
+    for item in havingItems:
+        for commandItem, wi in sorted(W[item].items(),key=operator.itemgetter(1), reverse=True)[:K]:
+            if commandItem in havingItems:
+                continue
+            if commandItem not in rank.keys():
+                rank[commandItem] = 0
+                reason[commandItem] = dict()
+            rank[commandItem] += 1*wi
+            #加入推荐物品的解释理由
+            if item not in reason[commandItem].keys():
+                reason[commandItem][item] = 0
+            reason[commandItem][item] += 1*wi
+    return rank,reason
 
+'''离线实验评价指标：准确率、召回率、覆盖度、流行度'''
+def PandR(train,test,K,topN):
+    hit = 0             #命中数量
+    allcommand = 0      #总推荐数
+    alltest = 0         #测试集总推荐数  
+    allitems = set()    #所有物品集合
+    allpopular = dict()   #所有物品流行度
+    cmditems = set()    #推荐物品的集合
+    cmdpopular = 0      #推荐物品的总流行度
+    
+    #计算所有物品的数量和流行度
+    for user,items in train.items():
+        for i in items:
+            allitems.add(i)
+            if i not in allpopular.keys():
+                allpopular[i] = 0
+            allpopular[i] += 1
+    #准确率和召回率
+    for U,items in test.items():
+        rank = sorted(command(train,U,W,K).items(), key=operator.itemgetter(1),reverse=True)[:topN]     #根据物品相似度推荐的所有物品
+        alltest += len(items)           #测试集所有实际物品
+        for commanditem, score in rank:
+            if commanditem in items:
+                hit += 1
+            allcommand += 1
+            cmditems.add(commanditem)
+            cmdpopular += np.log(1 + allpopular[commanditem])
+    precision = hit/allcommand
+    recall = hit/alltest
+    cover = len(cmditems)/len(allitems)
+    popular = cmdpopular/allcommand
+    print ('recall:{},precision:{}'.format(recall,precision))
+    print ('cover:{},popular:{}'.format(cover,popular))
+'''recall:0.10586423713589119,precision:0.21985343104596936'''
+'''cover:0.19118442401298,popular:7.2502167984452'''
+   
+'''算法改进：基于用户活跃度的惩罚，对高活跃度的用户其物品之间的相似度贡献变小'''    
+def ItemSimilarityIUF(train):
+    I_times = dict()            #统计每个物品出现的次数
+    I_Itimes = dict()           #统计物品与物品之间被几个用户喜欢
+    for user, items in train.items():
+        for item in items:
+            if item not in I_Itimes.keys():
+                I_Itimes[item] = dict()
+                I_times[item] = 0
+            I_times[item] += 1
+            for subitem in items:
+                if item == subitem:
+                    continue
+                if subitem not in I_Itimes[item].keys():
+                    I_Itimes[item][subitem] = 0
+                I_Itimes[item][subitem] += 1/np.log(1+len(items))
+    
+    W = dict()                  #物品之间的相似度
+    for item, others in I_Itimes.items():
+        W[item] = dict()
+        for subitem, times in others.items():
+            W[item][subitem] = times/np.sqrt(I_times[item]*I_times[subitem])
+'''recall:0.10821410239958938,precision:0.22473351099267155'''
+'''cover:0.1755002704164413,popular:7.350681913999984'''
 
+'''算法改进：物品相似度的归一化'''
 
+    
+    
+    
 
 
 
