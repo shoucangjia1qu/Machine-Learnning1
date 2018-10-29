@@ -8,6 +8,7 @@ Created on Thu Sep 20 19:10:12 2018
 import os
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from math import radians, cos, sin, asin, sqrt
 from selenium import webdriver
 import json
@@ -18,7 +19,7 @@ from bs4 import BeautifulSoup
 import copy
 import pickle
 
-os.chdir(r'D:\mywork\test')
+os.chdir(r'D:\工作资料\分行工作\交接\其他\创新\大数据项目\位置信息挖掘\结项材料')
 curpath=os.getcwd()
 
 
@@ -274,21 +275,45 @@ with open(curpath+"\\centerPoint.dat","wb") as obj:
 with open(curpath+"\\centerPoint.dat","rb") as f:
     cps=pickle.load(f)
 
+
 '''第二部分：找到目标客户'''
-
-
-
+'''7、先找到小区位置，再根据通配找到目标客户'''
+target = pd.read_csv("lianjia_xiaoqu_20180811.csv",encoding="GBK")
+targetData = np.array(target.iloc[:,3:5])
+targetMatrix = np.zeros((targetData.shape[0],len(cps)))
+m,n = targetMatrix.shape
+points = [i.get("point") for i in list(cps.values())]
+#生成目标距离矩阵
+for i in range(m):
+    for j in range(n):
+        targetMatrix[i,j] = dc.haversine(points[j][0],points[j][1],targetData[i][0],targetData[i][1])
+#选出500米内小区
+targetdict = dict()
+for col in range(n):
+    targetdict[col] = []
+    for row in range(m):
+        if targetMatrix[row,col]<=500:
+            targetdict[col].append(targetData.tolist()[row])
+#持久化1
+with open(curpath+"\\targetPoints.dat","wb") as obj:
+    pickle.dump(targetdict,obj)
+#持久化2,只选取目标圈内超过20个私行客户:
+targetList = []
+for idx,points in targetdict.items():
+    if idx<=12:
+        targetList.extend(points)
+targetDF = pd.DataFrame(targetList,columns=('lng','lat'))
+targetDF.to_csv("targetDF.csv")
 
 
 '''第三部分：对目标客户规划最短路径'''
 '''8、对圈内目标客户进行最短路径规划'''
 bm = Boltzmann()
-dataSet = np.array(circlePoints[0])
+dataSet = np.array(targetDF.iloc[:20,:])
 bm.train(dataSet)       #需要输入array格式
 print(bm.bestIter)      #最短路径迭代次数
 print(bm.bestDist)      #最短路径距离
 print(bm.bestPath)      #最短路径下标
-
 '''路径距离变化可视化'''
 dists = bm.distList
 plt.figure()
