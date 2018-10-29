@@ -332,7 +332,7 @@ def PandR(train,test,K,topN):
 '''recall:0.10586423713589119,precision:0.21985343104596936'''
 '''cover:0.19118442401298,popular:7.2502167984452'''
    
-'''算法改进：基于用户活跃度的惩罚，对高活跃度的用户其物品之间的相似度贡献变小'''    
+'''算法改进1：基于用户活跃度的惩罚，对高活跃度的用户其物品之间的相似度贡献变小'''    
 def ItemSimilarityIUF(train):
     I_times = dict()            #统计每个物品出现的次数
     I_Itimes = dict()           #统计物品与物品之间被几个用户喜欢
@@ -357,11 +357,25 @@ def ItemSimilarityIUF(train):
 '''recall:0.10821410239958938,precision:0.22473351099267155'''
 '''cover:0.1755002704164413,popular:7.350681913999984'''
 
-'''算法改进：物品相似度的归一化'''
+'''算法改进2：物品相似度的归一化(有点问题,究竟用Wj还是Wi)'''
+Wmax = dict()
+#横向取最大值和纵向取最大值是一样的，所以这里是横向取了最大值
+for i,i_items in W.items():
+    Wmax[i] = max(list(i_items.values()))
+Wj = copy.deepcopy(W)
+for i,i_items in Wj.items():
+    for j,v in i_items.items():
+        Wj[i][j] = v/Wmax[j]
+#Wj
+'''recall:0.038415886051584754,precision:0.07978014656895403'''
+'''cover:0.39724175229853975,popular:6.026280574239222'''
 
-    
-    
-    
-
+Wi = copy.deepcopy(W)
+for i,i_items in Wi.items():
+    for j,v in i_items.items():
+        Wi[i][j] = v/Wmax[i]
+#Wi
+'''recall:0.11200757089695881,precision:0.2326115922718188'''
+'''cover:0.22363439697133586,popular:7.242104855359775'''
 
 
