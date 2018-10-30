@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import copy
 import os
 
-os.chdir(r"D:\工作资料\分行工作\交接\其他\创新\大数据项目\聚类\源码")
+os.chdir(r"D:\mywork\test\ML_CCB")
 with open("4k2_far_data.txt") as f:
     file = f.readlines()
 train = np.array([[float(j) for j in i.split()] for i in file ])
@@ -142,12 +142,38 @@ plt.show()
 
 
 
+'''聚类个数评价：轮廓系数'''
+LK = []
+m = 0
+for data in train:
+    n=0
+    a = 0
+    b = dict()
+    avalue = 0
+    bvalue = 0
+    for subdata in train: 
+        if m==n:
+            n += 1
+            continue
+        if Labels[m] == Labels[n]:
+            a += KM.eDist(data,subdata)
+        else:
+            if Labels[n] not in b.keys():
+                b[Labels[n]] = 0
+            b[Labels[n]] += KM.eDist(data,subdata)
+        n += 1
+    '''a是点到本簇中其他点的平均距离'''
+    avalue = (a/(len(np.nonzero(Labels==Labels[m])[0])-1))
+    '''b是点到其他簇中其他点的平均距离的最小值'''
+    bvalue = np.min([value/len(np.nonzero(Labels==la)[0]) for la,value in b.items()])
+    LK.append((bvalue-avalue)/max(bvalue,avalue))
+    m += 1
+LKratio = np.mean(LK)
+'''轮廓系数：0.76066358485307373'''
 
-
-
-
-
-
+from sklearn import metrics
+metrics.silhouette_score(train, Labels, metric='euclidean')
+'''轮廓系数：0.76066358485307373'''
 
 
 
