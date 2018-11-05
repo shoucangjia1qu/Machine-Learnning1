@@ -378,4 +378,200 @@ for i,i_items in Wi.items():
 '''recall:0.11200757089695881,precision:0.2326115922718188'''
 '''cover:0.22363439697133586,popular:7.242104855359775'''
 
+######################################
+#                                    #
+#            LFM隐语义模型            #
+#                                    #
+######################################
+
+class LFM_CF(object):
+    '''1、初始化属性'''
+    def __init__(self):
+        
+        self.UserList = []          #用户列表
+        self.ItemList = []          #物品列表
+        self.UI_MA = 0              #用户-物品矩阵
+        self.ErrorList = []         #误差列表
+        self.ItemsPopular = dict()  #物品流行度
+        
+        
+        
+    '''2、得到最初的用户-物品矩阵'''
+    def initUI(ratings):
+        #转换成U_I矩阵
+        ItemList = list(set(ratings[:,1]))
+        UserList = list(set(ratings[:,0]))
+        UI_MA = np.zeros((len(UserList),len(ItemList)))
+        for u,i in ratings:
+            IdxU = UserList.index(u)
+            IdxI = ItemList.index(i)
+            UI_MA[IdxU,IdxI] = 1
+    
+    '''3、获取负样本'''
+    def getNativeItems(u,ItemList,UI_MA,ratings):
+        #为每个用户选取正负样本，并保存用户正负样本的下标
+        allItemsIndex = []
+        for v in range(len(ItemList)):
+            if UI_MA[u,v] == 1:
+                allItemsIndex.append(v)
+        #随机选取负样本物品下标
+        n = 0
+        for choose in range(int(UI_MA[u,:].sum() * 3)):
+            nativeItem = ratings[random.randint(0,len(ratings) - 1 ),1]
+            index = ItemList.index(nativeItem)
+            if index in allItemsIndex:
+                continue
+            else:
+                allItemsIndex.append(index)
+                n += 1
+            if n > UI_MA[u,:].sum():
+                break
+        return allItemsIndex
+        
+    
+    '''4、单个矩阵的L2范数'''
+    def calMaError(matrix):
+        L2 = np.linalg.norm(matrix)
+        return L2
+    
+    '''5、整个迭代的误差计算'''    
+    def SumError(UI_MA,Uk,Ik,Lambda):
+        pre = np.dot(Uk,Ik)       #预测的用户-物品矩阵
+        EUI = UI_MA - pre      #每一个用户-物品的预测误差
+        sumError = np.power(EUI,2).sum() + Lambda*np.power(calMaError(Uk),2) + Lambda*np.power(calMaError(Ik),2)
+        return sumError
+    
+    '''6、画误差曲线'''
+    def drawError(steps,ErrorList):
+        plt.figure()
+        plt.plot(list(range(steps)),ErrorList)
+        plt.show()
+        
+    '''7、推荐函数'''
+    def command(u,Uk,Ik):
+    
+    '''6、正式程序'''
+    def train(trainSet,Lambda,r,F)
+        Lambda = 0.01
+        r = 0.02
+        ErrorList = []
+        #初始化U_F和F_I矩阵
+        m,n = UI_MA.shape
+        Uk = np.random.rand(m,100)               #UxF
+        Ik = np.random.rand(100,n)               #FxI
+        for step in range(300):
+            for u in range(m):
+                #1、选取正负样本
+                allItemsIndex = getNativeItems(u,ItemList,UI_MA,ratings)
+                for i in allItemsIndex:
+                    #2、预测和实际误差
+                    pre = np.dot(Uk[u,:],Ik[:,i])
+                    eui = UI_MA[u,i] - pre
+                    #3、迭代Uk和Ik                        
+                    Uk[u,:] += r*(eui*Ik[:,i].T - Lambda*Uk[u,:])        #1xF
+                    Ik[:,i] += r*(eui*Uk[u,:].T - Lambda*Ik[:,i])        #Fx1
+            Error = SumError(UI_MA,Uk,Ik,Lambda)                 #总误差计算
+            ErrorList.append(Error)
+            r *= 0.9
+
+
+
+
+
+
+
+'''Uk和Ik隐因子矩阵持久化'''
+with open(curpath+"\\Uk.dat","wb") as obj1:
+    pickle.dump(Uk,obj1)
+with open(curpath+"\\Ik.dat","wb") as obj2:
+    pickle.dump(Ik,obj2)
+
+
+
+
+'''测评离线指标'''
+    def PandR(train,test,K,topN):
+        hit = 0             #命中数量
+        allcommand = 0      #总推荐数
+        alltest = 0         #测试集总推荐数  
+        allitems = set()    #所有物品集合
+        allpopular = dict()   #所有物品流行度
+        cmditems = set()    #推荐物品的集合
+        cmdpopular = 0      #推荐物品的总流行度
+        
+        #计算所有物品的数量和流行度
+        for user,items in train.items():
+            for i in items:
+                allitems.add(i)
+                if i not in allpopular.keys():
+                    allpopular[i] = 0
+                allpopular[i] += 1
+        #准确率和召回率
+        for U,items in test.items():
+            rank = sorted(command(train,U,W,K).items(), key=operator.itemgetter(1),reverse=True)[:topN]     #根据物品相似度推荐的所有物品
+            alltest += len(items)           #测试集所有实际物品
+            for commanditem, score in rank:
+                if commanditem in items:
+                    hit += 1
+                allcommand += 1
+                cmditems.add(commanditem)
+                cmdpopular += np.log(1 + allpopular[commanditem])
+        precision = hit/allcommand
+        recall = hit/alltest
+        cover = len(cmditems)/len(allitems)
+        popular = cmdpopular/allcommand
+        print ('recall:{},precision:{}'.format(recall,precision))
+        print ('cover:{},popular:{}'.format(cover,popular))
+
+
+
+
+
+
+
+
+
+######################################
+#                                    #
+#      基于图的模型——PersonalRank     # 
+#                                    #
+######################################
+G = {
+     'A':{'a':1,'c':1},
+     'B':{'a':1,'c':1,'d':1},
+     'C':{'c':1,'d':1,},
+     'a':{'A':1,'B':1},
+     'b':{'B':1},
+     'c':{'A':1,'B':1,'C':1},
+     'd':{'B':1,'C':1}
+     }
+
+def PersonalRank(G,alpha,root,Maxiter):
+    '''1、初始化rank,初始节点为1，其他为0'''
+    rank = dict()
+    rank = {x:0 for x in G.keys()}
+    rank[root] = 1
+    '''2、开始迭代，有alpha的概率继续往下走，回到原节点的概率为(1-alpha)'''
+    for i in range(Maxiter):
+        '''2-1初始化'''
+        temp = {x:0 for x in G.keys()}
+        '''2-2遍历每个主节点和到子节点的所有路径'''
+        for leaf, subpath in G.items():
+            for subleaf, path in subpath.items():
+                '''2-3计算主节点到子节点的概率'''
+                temp[subleaf] += rank[leaf]*1.0/len(subpath)
+        '''2-4加上回到原节点的概率'''
+        rank[root] += 1-alpha
+        '''2-5替换为最新的rank'''
+        rank = temp
+    '''返回结果并打印'''
+    for key,value in rank:
+        print("{}:{}\t".format(key,value))
+    return rank
+
+
+
+
+
+
 
