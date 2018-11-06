@@ -383,6 +383,18 @@ for i,i_items in Wi.items():
 #            LFM隐语义模型            #
 #                                    #
 ######################################
+'''数据集准备'''
+tr = []
+te = []
+np.random.seed(1234)        #使用随机种子
+for user, item in ratings:
+    if random.randint(0,8) == 0:
+        te.append([user,item])
+    else:
+        tr.append([user,item])
+train = np.array(tr)
+test = np.array(te)
+
 
 class LFM_CF(object):
     '''1、初始化属性'''
@@ -406,6 +418,7 @@ class LFM_CF(object):
             IdxU = UserList.index(u)
             IdxI = ItemList.index(i)
             UI_MA[IdxU,IdxI] = 1
+        return ItemList,UserList,UI_MA
     
     '''3、获取负样本'''
     def getNativeItems(u,ItemList,UI_MA,ratings):
@@ -428,7 +441,6 @@ class LFM_CF(object):
                 break
         return allItemsIndex
         
-    
     '''4、单个矩阵的L2范数'''
     def calMaError(matrix):
         L2 = np.linalg.norm(matrix)
@@ -448,9 +460,53 @@ class LFM_CF(object):
         plt.show()
         
     '''7、推荐函数'''
-    def command(u,Uk,Ik):
+    def command(u,Uk,Ik,ItemList):
+        PRE_MA = np.dot(Uk,Ik)
+        rankIdx = np.argsort(-PRE_MA[u,:])
+        rank = [ItemList[x] for x in rankIdx]
+        return rank
     
-    '''6、正式程序'''
+        
+        
+    '''8、评价离线指标'''    
+    def PandR(test,topN):
+        hit = 0             #命中数量
+        allcommand = 0      #总推荐数
+        alltest = 0         #测试集总推荐数  
+        allitems = set()    #所有物品集合
+        allpopular = dict()   #所有物品流行度
+        cmditems = set()    #推荐物品的集合
+        cmdpopular = 0      #推荐物品的总流行度
+        '''8-1计算测试集总数和物品种类数'''
+        testdict = dict()
+        for u,i in test:
+            if u not in testdict.keys():
+                testdict[u] = []
+            testdict[u].append(i)
+        alltest = len(test)         
+        allitems = set(test[:,1])   
+        '''8-2计算所有物品流行度'''
+        for u,i in train:
+            if i not in allpopular.keys():
+                allpopular[i] = 0
+            allpopular[i] += 1
+        '''8-3计算推荐的一些指标'''    
+        for u in testdict.keys():
+            uIdx = UserList.index(u)
+            rank = command(uIdx,Uk,Ik,ItemList)[0:topN]
+            allcommand += len(rank)
+            for i in rank:
+                if i in testdict[u]:
+                    hit += 1
+                cmdpopular += np.log(1 + allpopular[i])
+                cmditems.add(i)
+        '''8-4计算离线指标'''
+        precision = hit/allcommand
+        recall = hit/alltest
+        cover = len(cmditems)/len(allitems)
+        popular = cmdpopular/allcommand
+    
+    '''9、正式程序'''
     def train(trainSet,Lambda,r,F)
         Lambda = 0.01
         r = 0.02
@@ -462,7 +518,7 @@ class LFM_CF(object):
         for step in range(300):
             for u in range(m):
                 #1、选取正负样本
-                allItemsIndex = getNativeItems(u,ItemList,UI_MA,ratings)
+                allItemsIndex = getNativeItems(u,ItemList,UI_MA,train)
                 for i in allItemsIndex:
                     #2、预测和实际误差
                     pre = np.dot(Uk[u,:],Ik[:,i])
@@ -473,11 +529,6 @@ class LFM_CF(object):
             Error = SumError(UI_MA,Uk,Ik,Lambda)                 #总误差计算
             ErrorList.append(Error)
             r *= 0.9
-
-
-
-
-
 
 
 '''Uk和Ik隐因子矩阵持久化'''
@@ -538,7 +589,7 @@ with open(curpath+"\\Ik.dat","wb") as obj2:
 ######################################
 G = {
      'A':{'a':1,'c':1},
-     'B':{'a':1,'c':1,'d':1},
+     'B':{'a':1,'b':1,'c':1,'d':1},
      'C':{'c':1,'d':1,},
      'a':{'A':1,'B':1},
      'b':{'B':1},
@@ -559,19 +610,17 @@ def PersonalRank(G,alpha,root,Maxiter):
         for leaf, subpath in G.items():
             for subleaf, path in subpath.items():
                 '''2-3计算主节点到子节点的概率'''
-                temp[subleaf] += rank[leaf]*1.0/len(subpath)
+                temp[subleaf] += alpha*rank[leaf]/(1.0*len(subpath))
         '''2-4加上回到原节点的概率'''
-        rank[root] += 1-alpha
+        temp[root] += 1-alpha
         '''2-5替换为最新的rank'''
         rank = temp
-    '''返回结果并打印'''
-    for key,value in rank:
-        print("{}:{}\t".format(key,value))
+    '''3、返回结果并打印'''
     return rank
 
-
-
-
-
+'''迭代结果：
+'A': 0.2693021269247673, 'B': 0.18500260096234777, 'C': 0.0862357653687032, 
+'a': 0.15376647851670905, 'b': 0.039313063639090935, 'c': 0.19041668973299994, 
+'d': 0.07596327485538182'''
 
 
