@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import operator
 import os
 
-os.chdir(r'D:\mywork\test\command\lastfm-dataset-360K\lastfm-dataset-360K')
+os.chdir(r'D:\mywork\test\command\regItemCold')
 curpath = os.getcwd()
 #with open("users.txt","rb") as f:
 #    users = f.readlines
@@ -69,18 +69,141 @@ musicList = list(music.artistName.value_counts().index)
 userCate_Music = np.zeros((len(musicList),len(userCate)))
 music_array = np.array(music)
 for x in range(len(music_array)):
+    U = music_array[x,0]
     '''4-1确定用户所属群体的Index'''
-    if music_array[x,0] in train:
+    if U in train:
         temp = users[users['id']==U]
-        Ugender = temp.gender[0]
-        Uage = temp.age[0]
-        Ucountry = temp.country[0]
+        Ugender = temp.gender.values[0]
+        Uage = temp.age.values[0]
+        Ucountry = temp.country.values[0]
         userCateIdx = userCate.index(Ugender+Uage+Ucountry)
         '''4-1确定艺术家的Index'''
         artistIdx = musicList.index(music_array[x,2])
         '''4-2相应位置+1'''
         userCate_Music[artistIdx,userCateIdx] += 1
-    
+
+'''5、根据测试用户所属群体推荐'''
+def command(u,users,userCate,musicList,userCate_Music,TopN):
+    '''5-1确定测试用户所属群体的Index'''
+    testtemp = users[users['id'] == u]
+    Tgender = testtemp.gender.values[0]
+    Tage = testtemp.age.values[0]
+    Tcountry = testtemp.country.values[0]
+    TuserCateIdx = userCate.index(Tgender+Tage+Tcountry)
+    '''5-2确定用户所属群体的音乐推荐'''
+    MuList = userCate_Music[:,TuserCateIdx]
+    MuIdx = np.argsort(-MuList)[:,TopN]
+    '''5-3返回推荐的音乐'''
+    rank = [musicList[x] for x in MuIdx]
+    return rank
+
+'''6、根据细颗粒度（性别、年龄、国籍）划分的客群评估成效'''   
+hit = 0
+allcommand = 0
+alltest = 0
+allMusic = 0
+cmdMusic = set()
+for uid in test:
+    '''6-1推荐的TopN产品'''
+    rank = command(uid,users,userCate,musicList,userCate_Music,10)
+    '''6-2计算全部推荐产品的数量'''
+    allcommand += len(rank)
+    '''6-3计算用户实际的产品数量'''
+    alltest += len(testMusic)
+    '''6-4计算全部产品的数量'''
+    allMusic = len(musicList)
+    '''6-5计算推荐产品的命中数量和产品集合'''
+    for j in rank:
+        if j in testMusic:
+            hit += 1
+        cmdMusic.add(i)
+    '''6-6输出离线指标'''
+    precision = hit/allcommand
+    recall = hit/alltest
+    cover = len(cmdMusic)/allMusic
+
+
+######################################
+#                                    #
+#           利用用户标签              #
+#                                    #
+######################################
+import numpy as np
+import pandas as pd
+import os, operator, pickle
+import matplotlib.pyplot as plt
+
+os.chdir(r"D:\mywork\test\command\Tag")
+with open("user_taggedbookmarks-timestamps.dat","r",encoding="utf-8",errors="ignore" ) as f:
+    content = f.readlines()
+data = np.array([x.split() for x in content][1:])
+single_UI = pd.DataFrame(data[:,0:2]).drop_duplicates()
+single_UI = np.array([list(single_UI.iloc[:,0]),list(single_UI.iloc[:,1])]).T
+'''按照用户-物品划分训练集和测试集'''
+UItrain = []
+UItest = []
+np.random.seed(1234)
+for ui in single_UI:
+    if np.random.randint(0,10) == 0:
+        UItest.append(ui.tolist())
+    else:
+        UItrain.append(ui.tolist())
+'''再将标签加入，生成用户-物品-标签的训练集和测试集'''
+trainIdx = []
+testIdx = []
+for i in range(len(data)):
+    if data[i,0:2].tolist() in UItest:
+        testIdx.append(i)
+    else:
+        trainIdx.append(i)
+train = data[trainIdx]
+test = data[testIdx]
+'''得到两两矩阵'''
+userList = list(set(train[:,0]))
+bookList = list(set(train[:,1]))
+tagList = list(set(train[:,2]))
+'''U_T,U_I,T_I矩阵'''
+U_T = np.zeros((len(userList),len(tagList)))
+U_I = np.zeros((len(userList),len(bookList)))
+T_I = np.zeros((len(tagList),len(bookList)))
+for u,i,t in train[:,0:3]:
+    uIdx = userList.index(u)
+    iIdx = bookList.index(i)
+    tIdx = tagList.index(t)
+    U_T[uIdx,tIdx] += 1
+    U_I[uIdx,iIdx] += 1
+    T_I[tIdx,iIdx] += 1
+'''得出预测的矩阵'''
+Wui = np.dot(U_T,T_I)
+#将已有的UI项目变为0
+Wui[U_I>0] = 0
+'''command推荐'''
+def command(u,topN):
+    global bookList,userList,Wui
+    rank = {}
+    uIdx = userList.index(u)
+    itemsIdx = np.argsort(-Wui[uIdx])[0:topN]
+    for itemIdx in itemsIdx:
+        item = bookList[itemIdx]
+        rank[item] = Wui[uIdx,itemIdx]
+    return rank
+'''推荐评价'''
+topN = 100
+UI_test = np.array(UItest)
+testUserList = list(set(UI_test[:,0]))
+alltest = len(UI_test)
+allcommand = len(testUserList)*topN
+hit = 0
+for user in testUserList:
+    try:
+        rank = command(user,topN)
+        testItems = UI_test[UI_test[:,0]==user][:,1].tolist()
+        for cmditem in rank.keys():
+            if cmditem in testItems:
+                hit += 1
+    except:
+        print("客户不在训练集中")
+
 
 
 
