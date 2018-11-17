@@ -187,13 +187,26 @@ def command(u,topN):
         item = bookList[itemIdx]
         rank[item] = Wui[uIdx,itemIdx]
     return rank
+'''夹角余弦'''
+def cosDist(v1,v2):
+    sim = np.dot(v1,v2)/np.linalg.norm(v1)*np.linalg.norm(v2)
+    return sim
 '''推荐评价'''
 topN = 100
+allpopular = dict()
+allItems = len(bookList)
 UI_test = np.array(UItest)
 testUserList = list(set(UI_test[:,0]))
 alltest = len(UI_test)
 allcommand = len(testUserList)*topN
 hit = 0
+cmdpopular = 0
+cmdItems = set()
+cmdSim = 0
+for i in range(len(bookList)):
+    if bookList[i] not in allpopular.keys():
+        allpopular[bookList[i]] = 0
+    allpopular[bookList[i]] += len(U_I[:,i][U_I[:,i]>0])
 for user in testUserList:
     try:
         rank = command(user,topN)
@@ -201,13 +214,58 @@ for user in testUserList:
         for cmditem in rank.keys():
             if cmditem in testItems:
                 hit += 1
+            cmdpopular += allpopular[cmditem]
+            cmdItems.add(cmditem)
     except:
         print("客户不在训练集中")
+I_T = T_I.T
+for i in cmdItems:
+    for j in cmdItems:
+        if i==j:
+            continue
+        iIdx = bookList.index(i)
+        jIdx = bookList.index(j)
+        cmdSim += cosDist(I_T[iIdx],I_T[jIdx])
 
 
+precision = hit/allcommand
+recall = hit/alltest
+pop = cmdpopular/allcommand
+cover = len(cmdItems)/allItems
+multi = cmdSim/len(cmdItems)
 
+print('''precision:{}\t
+         recall:{}\t
+         pop:{}\t
+         cover:{}\t
+         multi:{}'''.format(precision,recall,pop,cover,multi))
 
+'''算法改进1：引入惩罚因子'''
+#新的矩阵(U_T和T_I)
+U_TNew = np.zeros((len(userList),len(tagList)))
+T_INew = np.zeros((len(tagList),len(bookList)))
+#惩罚因子，某标签被多少用户使用过
+for tIdx in range(len(tagList)):
+    Ntu = len(U_T[U_T[:,tIdx]>0])
+    U_TNew[:,tIdx] = U_T[:,tIdx]/np.log(1+Ntu)
+#惩罚因子，某物品被多少用户打过标签
+for iIdx in range(len(bookList)):
+    Niu = len(U_I[U_I[:,iIdx]>0])
+    T_INew[:,iIdx] = T_I[:,iIdx]/np.log(1+Niu)
 
+'''得出预测的矩阵'''
+Wui2 = np.dot(U_TNew,T_INew)
+#将已有的UI项目变为0
+Wui2[U_INew>0] = 0
+
+'''算法改进2：改进数据稀疏性'''
+#先计算标签相似度
+TagSim = np.zeros((len(tagList),len(tagList)))
+for i in range(len(tagList)):
+    for j in range(len(tagList)):
+        if i==j:
+            continue
+        TagSim[i,j] = cosDist(T_I[i],T_I[j])
 
 
 
