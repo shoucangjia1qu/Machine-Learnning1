@@ -252,7 +252,6 @@ for tIdx in range(len(tagList)):
 for iIdx in range(len(bookList)):
     Niu = len(U_I[U_I[:,iIdx]>0])
     T_INew[:,iIdx] = T_I[:,iIdx]/np.log(1+Niu)
-
 '''得出预测的矩阵'''
 Wui2 = np.dot(U_TNew,T_INew)
 #将已有的UI项目变为0
@@ -266,6 +265,102 @@ for i in range(len(tagList)):
         if i==j:
             continue
         TagSim[i,j] = cosDist(T_I[i],T_I[j])
+
+'''算法改进3：标签清理'''
+
+######################################
+#                                    #
+#     用户标签中基于图的推荐算法        #
+#                                    #
+######################################
+import numpy as np
+import pandas as pd
+import os, operator, pickle
+import matplotlib.pyplot as plt
+
+#Simple Tag Graph
+#创建Graph{U{I:n}}，凡是用户为物品打过标签的都+1。
+graphData = data[0:5000,0:3]        #只取了5000条数据，U,I,T
+def buildGraph(data):
+    '''生成图字典'''
+    graphDict = dict()
+    for u,i,t in data:
+        if u not in graphDict.keys():
+            graphDict[u] = dict()
+        if i not in graphDict[u].keys():
+            graphDict[u][i] = 0
+        graphDict[u][i] += 1
+        if i not in graphDict.keys():
+            graphDict[i] = dict()
+        if u not in graphDict[i].keys():
+            graphDict[i][u] = 0
+        graphDict[i][u] += 1
+    '''生成图矩阵'''
+    uList = list(set(data[:,0]))
+    iList = list(set(data[:,1]))
+    tList = list(set(data[:,2]))
+    graphMa = np.zeros((len(uList),len(iList)))
+    for u,i,t in data:
+        uIdx = uList.index(u)
+        iIdx = iList.index(i)
+        tIdx = tList.index(t)
+        graphMa[uIdx,iIdx]  += 1
+    return graphDict,graphMa
+
+graphDict, graphMa = buildGraph(graphData)
+
+'''基于词典的迭代方法'''
+def PersonalRank(G,alpha,root,Maxiter):
+    '''1、初始化rank,初始节点为1，其他为0'''
+    rank = dict()
+    rank = {x:0 for x in G.keys()}
+    rank[root] = 1
+    '''2、开始迭代，有alpha的概率继续往下走，回到原节点的概率为(1-alpha)'''
+    for i in range(Maxiter):
+        '''2-1初始化'''
+        temp = {x:0 for x in G.keys()}
+        '''2-2遍历每个主节点和到子节点的所有路径'''
+        for leaf, subpath in G.items():
+            for subleaf, path in subpath.items():
+                '''2-3计算主节点到子节点的概率'''
+                temp[subleaf] += alpha*rank[leaf]/(1.0*len(subpath))
+        '''2-4加上回到原节点的概率'''
+        temp[root] += 1-alpha
+        '''2-5替换为最新的rank'''
+        rank = temp
+    '''3、返回结果并打印'''
+    return rank
+
+rank = PersonalRank(graphDict,0.85,'8',100)
+
+'''基于矩阵的迭代方法'''
+def PersonalRank2(GMa,alpha,rootIdx,Maxiter):
+    row,col = GMa.shape
+    uRank = np.zeros((row,1))
+    iRank = np.zeros((1,col))
+    uRank[rootIdx,0] = 1
+    proI = np.zeros((row,col))
+    proU = np.zeros((row,col))
+    for c in range(col):
+        proI[:,c] = GMa[:,c]/GMa.sum(axis=1)
+    for r in range(row):
+        proU[r,:] = GMa[r,:]/GMa.sum(axis=0)
+    for i in range(Maxiter):
+        itemp = np.dot(alpha*uRank.T,proI)
+        utemp = np.dot(alpha*iRank,proU.T)
+        utemp[0,rootIdx] += 1-alpha
+        iRank = itemp
+        uRank = utemp.T
+    return iRank,uRank
+
+iRank,uRank = PersonalRank2(graphMa,0.85,8,100)
+
+
+
+
+
+
+
 
 
 
