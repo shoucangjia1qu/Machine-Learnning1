@@ -188,19 +188,27 @@ for u,i,s,t in np.array(trainSet):
     I_UDict[i][u] = t
 '''0-3通用函数。夹角余弦函数'''
 def cosdist(v1,v2):
-
     return np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
 '''1、ICF算法，且考虑进用户活跃度'''
 '''1-1计算用户相似度，矩阵运算'''
+def cosdist_ICF(Wu,v1,v2):
+    return np.dot(Wu,np.multiply(v1,v2))/(np.linalg.norm(v1)*np.linalg.norm(v2))
 def ICF_W(train):
     row,col = train.shape
+    '''计算用户活跃度数组'''
+    Wu = np.zeros(row)
+    for u in range(row):
+        Wu[u] = 1/np.log(1+len(train[u,:][train[u,:]>0]))
+    '''计算物品相似度'''
     W = np.ones((col,col))
     for i in range(col):
         for j in range(col):
             if i==j:
                 continue
-            W[i,j] = cosdist(train[:,i],train[:,j])
+            W[i,j] = cosdist_ICF(Wu,train[:,i],train[:,j])
     return W
+ICF_WMa = ICF_W(U_IMatrix)
+
 '''1-1计算物品相似度，字典运算（用于和矩阵运算进行核对与比较）'''
 '''一致'''
 def ICF_WD(train):
@@ -219,7 +227,7 @@ def ICF_WD(train):
                     continue
                 if j not in Sim[i].keys():
                     Sim[i][j] = 0
-                Sim[i][j] += 1
+                Sim[i][j] += 1/np.log(1+len(i_t))
     #计算物品之间的相似度
     W = dict()
     for i,wj in Sim.items():
@@ -228,16 +236,29 @@ def ICF_WD(train):
             W[i][j] = wij/np.sqrt(ItemNum[i]*ItemNum[j])
     return W
 
+'''2、UCF算法，且考虑进物品流行度的因素'''
+'''2-1定义专属距离公式'''
+def cosdist_UCF(Wi,v1,v2):
+    return np.dot(Wi,np.multiply(v1,v2))/(np.linalg.norm(v1)*np.linalg.norm(v2))
+'''2-2定义用户相似度矩阵，训练集为UI矩阵'''
+def UCF_W(train):
+    row,col = train.shape
+    '''计算物品流行度数组'''
+    Wi = np.zeros(col)
+    for i in range(col):
+        Wi[i] = 1/np.log(1+len(train[:,i][train[:,i]>0])+1.0e-6)                #物品2039无训练集，所以加了个exp
+    '''计算用户相似度'''
+    W = np.ones((row,row))
+    for u in range(row):
+        for v in range(row):
+            if u==v:
+                continue
+            W[u,v] = cosdist_UCF(Wi,train[u,:],train[v,:])
+        print("{}已完成".format(u))
+    return W
+UCF_WMa = UCF_W(U_IMatrix)
 
-
-
-
-
-
-
-
-
-
+'''3、基于图的算法'''
 
 
 
