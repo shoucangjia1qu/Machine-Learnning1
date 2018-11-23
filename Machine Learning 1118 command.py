@@ -258,7 +258,67 @@ def UCF_W(train):
     return W
 UCF_WMa = UCF_W(U_IMatrix)
 
-'''3、基于图的算法'''
+'''3、基于图的算法，随机游走'''
+def PersonalRank(train,Uroot,alpha,Iters):
+    global UserList,ItemList,TimeList
+    row,col = train.shape
+    '''建立用户排序和物品排序'''
+    uRank = np.zeros((1,row))
+    iRank = np.zeros((1,col))
+    uRank[0,UserList.index(Uroot)] = 1
+    '''根据用户和物品节点的出度，计算权重'''
+    IRatio_U = np.zeros((row,col))
+    URatio_I = np.zeros((row,col))
+    for iIdx in range(col):
+        IRatio_U[:,iIdx] = train[:,iIdx]/train.sum(axis=1)
+    for uIdx in range(row):
+        URatio_I[uIdx,:] = train[uIdx,:]/(train.sum(axis=0)+1.0e-6)
+    '''迭代每个节点的概率'''
+    for step in range(Iters):
+        itemp = np.dot(alpha*uRank,IRatio_U)
+        utemp = np.dot(alpha*iRank,URatio_I.T)
+        utemp[0,UserList.index(Uroot)] += (1-alpha)
+        iRank = itemp
+        uRank = utemp
+        print("第{}次迭代".format(step))
+    return iRank,uRank
+iRank,uRank = PersonalRank(U_IMatrix,1,0.8,10)
+
+'''3、基于图的算法，随机游走，字典运算和上面进行比较'''
+'''3-1创建用户和物品节点'''
+G = dict()
+for u,i,s,t in np.array(trainSet):
+    uName = 'u{}'.format(u)
+    iName = 'i{}'.format(i)
+    '''加入用户节点'''
+    if uName not in G.keys():
+        G[uName] = dict()
+    if i not in G[uName].keys():
+        G[uName][iName] = 0
+    G[uName][iName] = t
+    '''加入物品节点'''
+    if iName not in G.keys():
+        G[iName] = dict()
+    if u not in G[iName].keys():
+        G[iName][uName] = 0
+    G[iName][uName] = t
+'''3-2随机游走'''
+def PersonalRank(G,alpha,root,Maxiter):
+    rank = dict()
+    rank = {x:0 for x in G.keys()}
+    rank[root] = 1
+    for i in range(Maxiter):
+        temp = {x:0 for x in G.keys()}
+        for leaf, subpath in G.items():
+            for subleaf, path in subpath.items():
+                temp[subleaf] += alpha*rank[leaf]/(1.0*len(subpath))
+        temp[root] += 1-alpha
+        rank = temp
+    return rank
+GRank = PersonalRank(G,0.8,'u1',10)
+
+
+
 
 
 
