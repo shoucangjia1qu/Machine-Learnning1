@@ -146,6 +146,7 @@ import pickle
 import matplotlib.pyplot as plt
 import operator
 import os
+import copy
 
 os.chdir(r'D:\mywork\test\command\UI_CF')
 curpath = os.getcwd()
@@ -189,10 +190,11 @@ for u,i,s,t in np.array(trainSet):
 '''0-3通用函数。夹角余弦函数'''
 def cosdist(v1,v2):
     return np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
+
 '''1、ICF算法，且考虑进用户活跃度'''
 '''1-1计算用户相似度，矩阵运算'''
 def cosdist_ICF(Wu,v1,v2):
-    return np.dot(Wu,np.multiply(v1,v2))/(np.linalg.norm(v1)*np.linalg.norm(v2))
+    return np.dot(Wu,np.multiply(v1,v2))/(np.linalg.norm(v1)*np.linalg.norm(v2)+1.0e-6)
 def ICF_W(train):
     row,col = train.shape
     '''计算用户活跃度数组'''
@@ -200,7 +202,7 @@ def ICF_W(train):
     for u in range(row):
         Wu[u] = 1/np.log(1+len(train[u,:][train[u,:]>0]))
     '''计算物品相似度'''
-    W = np.ones((col,col))
+    W = np.zeros((col,col))
     for i in range(col):
         for j in range(col):
             if i==j:
@@ -316,6 +318,202 @@ def PersonalRank(G,alpha,root,Maxiter):
         rank = temp
     return rank
 GRank = PersonalRank(G,0.8,'u1',10)
+
+'''4、按时间流行度推荐，用矩阵运算'''
+def RecentPop(train,alpha,T):
+    row,col = train.shape
+    PopMa=np.zeros(col)
+    for i in range(col):
+        PopMa[i] = 0
+        temp = train[:,i][train[:,i]>0]
+        PopMa[i] = np.sum(1/(1+alpha*(T-temp)))
+    return PopMa
+PopMa = RecentPop(U_I_TMatrix,0.8,max(TimeList))      
+
+'''4、按时间流行度推荐，用字典运算'''
+def RecentPop_Dict(train,alpha,T):
+    PopDict = dict()
+    for u,i,s,t in np.array(trainSet):
+        if i not in PopDict.keys():
+            PopDict[i] = 0
+        PopDict[i] += 1/(1+alpha*(T-t))
+    return PopDict
+PopDict = RecentPop_Dict(trainSet,0.8,max(TimeList))
+
+'''5、TICF算法，考虑用户对物品的时间戳'''
+def TICF_W(train,alpha):
+    OneMa = copy.deepcopy(train)
+    OneMa[OneMa>0] = 1
+    row,col = train.shape
+    W = np.zeros((col,col))
+    for i in range(col):
+        for j in range(col):
+            if i==j:
+                continue
+            wij = np.dot(1/(1+alpha*abs(train[:,i]-train[:,j])),np.multiply(OneMa[:,i],OneMa[:,j]))
+            W[i,j] = wij/(np.linalg.norm(OneMa[:,i])*np.linalg.norm(OneMa[:,j])+1.0e-6)
+    return W
+TICF_WMa = TICF_W(U_I_TMatrix,0.8)
+
+'''5、TICF算法，考虑用户对物品的时间戳，不过是字典数据集，用以和矩阵算法做对比'''
+def TICF_WDict(train,alpha):
+    ItemNum = dict()
+    SimNum = dict()
+    for u,i_t in U_IDict.items():
+        for i, itimestamp in i_t.items():
+            '''计算喜欢该物品的用户数'''
+            if i not in ItemNum.keys():
+                ItemNum[i] = 0
+            ItemNum[i] += 1
+            '''计算两两物品之间的同一个用户数'''
+            if i not in SimNum.keys():
+                SimNum[i] = dict()
+            for j, jtimestamp in i_t.items():
+                if i==j:
+                    continue
+                if j not in SimNum[i].keys():
+                    SimNum[i][j] = 0
+                SimNum[i][j] += 1/(1+alpha*abs(itimestamp-jtimestamp))
+    W = dict()
+    for i, j_wij in SimNum.items():
+        W[i] = dict()
+        for j, wij in j_wij.items():
+            W[i][j] = wij/np.sqrt(ItemNum[i]*ItemNum[j])
+    return W
+TICF_WDict = TICF_WDict(U_IDict,0.8)
+
+'''6、TUCF算法，考虑用户对物品的时间戳'''
+def TUCF_WMa(train,alpha):
+    OneMa = copy.deepcopy(train)
+    OneMa[OneMa>0] = 1
+    row,col = train.shape
+    W = np.zeros((row,row))
+    for ui in range(row):
+        for uj in range(row):
+            if ui==uj:
+                continue
+            wij = np.dot(1/(1+alpha*abs(train[ui,:]-train[uj,:])),np.multiply(OneMa[ui,:],OneMa[uj,:]))
+            W[ui,uj] = wij/(np.linalg.norm(OneMa[ui,:])*np.linalg.norm(OneMa[uj,:])+1.0e-6)
+    return W
+TUCF_WMa = TUCF_WMa(U_I_TMatrix,0.8)    
+
+'''7、推荐评价'''
+'''有以下算法对应的权重，需要分别推荐与评价
+Item_CF:ICF_WMa,W
+User_CF:UCF_WMa
+TItem_CF:TICF_WMa,TICF_WDict
+TUser_CF:TUCF_WMa
+RecentPOP:PopMa,PopDict
+PersonalRANK:iRank,GRank
+'''
+class CommandCheck(object):
+    '''7-1初始化类'''
+    def __init__(self):
+        self.userNum = 0
+        self.testNum = 0
+        self.TopN = 0
+        self.commandNum = 0
+        self.K = 0             #选择相邻的10个用户或者物品
+        self.hit = 0            #命中数据
+        self.precision = 0     #准确率
+        self.recall = 0           #召回率
+        
+    '''7-2Item_CF算法推荐和评价'''
+    def CommandICF(self,W,User,K,TopN):
+        global UserList,ItemList,TimeList,U_IDict
+        havingItems = U_IDict[User].keys()
+        rank = dict()
+        reason = dict()
+        for i in havingItems:
+            iIdx = ItemList.index(i)
+            SimItemIdx = np.argsort(-W[iIdx,:])[0:K]
+            for cmdiIdx in SimItemIdx:
+                if ItemList[cmdiIdx] in havingItems:
+                    continue
+                if ItemList[cmdiIdx] not in rank.keys():
+                    rank[ItemList[cmdiIdx]] = 0
+                    reason[ItemList[cmdiIdx]] = dict()
+                rank[ItemList[cmdiIdx]] += W[iIdx,cmdiIdx]
+                if i not in reason[ItemList[cmdiIdx]].keys():
+                    reason[ItemList[cmdiIdx]][i] = 0
+                reason[ItemList[cmdiIdx]][i] += W[iIdx,cmdiIdx]
+        cmdRANK = sorted(rank.items(), key=operator.itemgetter(1), reverse=True)[0:TopN]
+        return cmdRANK,reason
+    
+    def check(self,W,testDict,K,TopN):            
+        hit = 0
+        self.K = K
+        self.TopN = TopN
+        self.userNum = len(testDict)
+        self.commandNum = self.TopN*self.userNum
+        for u,i in testDict.items():
+            self.testNum += len(i)
+            CmdRank,Reason = self.CommandICF(W,u,K,TopN)
+            for cmdi ,wi in CmdRank:
+                if cmdi in i:
+                    hit += 1
+                    print(u,':',hit)
+        self.hit = hit
+        self.precision = hit/self.commandNum
+        self.recall = hit/self.testNum
+        print("precison:{}".format(self.precision))
+        print("recall:{}".format(self.recall))
+    
+'''准备测试集字典'''
+testDict = dict()
+for u,i,s,t in np.array(testSet):
+    if u not in testDict.keys():
+        testDict[u] = set()
+    if i not in testDict[u]:
+        testDict[u].add(i)
+'''正式程序'''
+cmd =   CommandCheck()
+cmd.check(ICF_WMa,testDict,10,10)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+def command(train,U,W,K):
+    rank = dict()
+    havingItems = train[U]
+    for item in havingItems:
+        for commandItem, wi in sorted(W[item].items(),key=operator.itemgetter(1), reverse=True)[:K]:
+            if commandItem in havingItems:
+                continue
+            if commandItem not in rank.keys():
+                rank[commandItem] = 0
+            rank[commandItem] += 1*wi
+    return rank
+  
+    
+alltestNum = len(testSet)
+allcommandNum = TopN
+def CommandCheck()
+
 
 
 
