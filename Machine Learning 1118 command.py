@@ -85,6 +85,7 @@ def command(train,user,W,K,t0,beta):
             if j not in rank.keys():
                 rank[j] = 0
             rank[j] += 1.0*wij/(1+beta*(t0-tui))
+    return rank
 #用户的行为i发生的时间越近，其相似的物品j的权重越高
 
 '''2、User_CF'''
@@ -130,7 +131,8 @@ def command(train,user,W,K,t0,beta):
             if i in I_Tdict.keys():
                 continue
             if i not in rank.keys():
-                rank[i] = w/(1+beta*(t0-tui))
+                rank[i] = 0
+            rank[i] += w/(1+beta*abs(t0-tui))
     return rank
 rank = command(trainSet,1,Users_W,10,978300770,0.8)
 
@@ -250,7 +252,7 @@ def UCF_W(train):
     for i in range(col):
         Wi[i] = 1/np.log(1+len(train[:,i][train[:,i]>0])+1.0e-6)                #物品2039无训练集，所以加了个exp
     '''计算用户相似度'''
-    W = np.ones((row,row))
+    W = np.zeros((row,row))
     for u in range(row):
         for v in range(row):
             if u==v:
@@ -423,7 +425,6 @@ class CommandCheck(object):
         global UserList,ItemList,TimeList,U_IDict
         havingItems = U_IDict[User].keys()
         rank = dict()
-        reason = dict()
         for i in havingItems:
             iIdx = ItemList.index(i)
             SimItemIdx = np.argsort(-W[iIdx,:])[0:K]
@@ -432,15 +433,27 @@ class CommandCheck(object):
                     continue
                 if ItemList[cmdiIdx] not in rank.keys():
                     rank[ItemList[cmdiIdx]] = 0
-                    reason[ItemList[cmdiIdx]] = dict()
                 rank[ItemList[cmdiIdx]] += W[iIdx,cmdiIdx]
-                if i not in reason[ItemList[cmdiIdx]].keys():
-                    reason[ItemList[cmdiIdx]][i] = 0
-                reason[ItemList[cmdiIdx]][i] += W[iIdx,cmdiIdx]
         cmdRANK = sorted(rank.items(), key=operator.itemgetter(1), reverse=True)[0:TopN]
-        return cmdRANK,reason
-    
-    def check(self,W,testDict,K,TopN):            
+        return cmdRANK
+    '''第二种方法：用矩阵的思维来做'''
+    def CommandICF2(self,W,User,K,TopN):
+        global UserList,ItemList,U_IMatrix
+        rank = dict()
+        UserIdx = UserList.index(User)
+        havingItemsIdx = U_IMatrix[UserIdx,:].nonzero()[0]
+        havingItems = [ItemList[x] for x in havingItemsIdx]
+        for i in havingItemsIdx:
+            W[i,:][W[i,:]<np.sort(W[i,:])[-K]] = 0
+        rankW = W[havingItemsIdx,:].sum(axis=0)
+        for j in np.argsort(-rankW):
+            if ItemList[j] not in havingItems:
+                rank[ItemList[j]] = rankW[j]
+                #print(ItemList[j],rankW[j])
+            if len(rank)==TopN:
+                return rank
+                break
+    def ICFcheck(self,W,testDict,K,TopN):            
         hit = 0
         self.K = K
         self.TopN = TopN
@@ -448,8 +461,46 @@ class CommandCheck(object):
         self.commandNum = self.TopN*self.userNum
         for u,i in testDict.items():
             self.testNum += len(i)
-            CmdRank,Reason = self.CommandICF(W,u,K,TopN)
-            for cmdi ,wi in CmdRank:
+            CmdRank = self.CommandICF2(W,u,K,TopN)
+            for cmdi ,wi in CmdRank.items():
+                if cmdi in i:
+                    hit += 1
+                    print(u,':',hit)
+        self.hit = hit
+        self.precision = hit/self.commandNum
+        self.recall = hit/self.testNum
+        print("precison:{}".format(self.precision))
+        print("recall:{}".format(self.recall))
+
+    '''7-3User_CF算法推荐与评价'''
+    def CommandUCF(self,W,User,K,TopN):
+        global UserList,ItemList,TimeList,U_IDict,U_IMatrix
+        rank = dict()
+        havingItems = U_IDict[User].keys()
+        SimUserIdx = np.argsort(-W[UserList.index(User),:])[0:K]
+        UserSim = W[UserList.index(User),SimUserIdx]
+        SimUIMatrix = U_IMatrix[SimUserIdx,:]
+        SimItem = np.dot(UserSim,SimUIMatrix)
+        SimItemIdx = np.argsort(-SimItem)
+        for iIdx in SimItemIdx:
+            cmdItem = ItemList[iIdx]
+            if cmdItem in havingItems:
+                continue
+            #print(cmdItem)
+            rank[cmdItem] = SimItem[iIdx]
+            if len(rank) == TopN:
+                return rank
+                break
+    def UCFcheck(self,W,testDict,K,TopN):            
+        hit = 0
+        self.K = K
+        self.TopN = TopN
+        self.userNum = len(testDict)
+        self.commandNum = self.TopN*self.userNum
+        for u,i in testDict.items():
+            self.testNum += len(i)
+            CmdRank = self.CommandUCF(W,u,K,TopN)
+            for cmdi ,wi in CmdRank.items():
                 if cmdi in i:
                     hit += 1
                     print(u,':',hit)
@@ -459,16 +510,165 @@ class CommandCheck(object):
         print("precison:{}".format(self.precision))
         print("recall:{}".format(self.recall))
     
-'''准备测试集字典'''
+    '''7-4POP流行度算法推荐与评价'''
+    def CommandPOP(self,W,User,TopN):
+        global UserList,ItemList,U_IMatrix
+        rank = dict()
+        UserIdx = UserList.index(User)
+        havingItemsIdx = U_IMatrix[UserIdx,:].nonzero()[0]
+        for index in np.argsort(-W):
+            if index in havingItemsIdx:
+                continue
+            rank[ItemList[index]] = W[index]
+            if len(rank)==TopN:
+                return rank
+                break
+    def POPcheck(self,W,testDict,TopN):
+        hit = 0
+        self.TopN = TopN
+        self.userNum = len(testDict)
+        self.commandNum = self.TopN*self.userNum
+        for u,i in testDict.items():
+            self.testNum += len(i)
+            CmdRank = self.CommandPOP(W,u,TopN)
+            for cmdi ,wi in CmdRank.items():
+                if cmdi in i:
+                    hit += 1
+                    print(u,':',hit)
+        self.hit = hit
+        self.precision = hit/self.commandNum
+        self.recall = hit/self.testNum
+        print("precison:{}".format(self.precision))
+        print("recall:{}".format(self.recall))
+
+    '''7-5TItem_CF算法推荐和评价'''
+    def CommandTICF(self,W,User,K,TopN,T0,beta):
+        global UserList,ItemList,U_I_TMatrix
+        rank = dict()
+        userIdx = UserList.index(User)
+        havingiIdx = U_I_TMatrix[userIdx,:].nonzero()[0]
+        havingItems = [ItemList[x] for x in havingiIdx]
+        Tw = 1/(1+beta*abs(T0 - U_I_TMatrix[userIdx,havingiIdx]))
+        for iIdx in havingiIdx:
+            W[iIdx,:][W[iIdx,:]<np.sort(W[iIdx,:])[-K]] = 0
+        Iw = W[havingiIdx,:]
+        rankW = np.dot(Tw,Iw)
+        for i in np.argsort(-rankW):
+            cmdItem = ItemList[i]
+            if cmdItem not in havingItems:
+                rank[cmdItem] = rankW[i]
+            if len(rank) == TopN:
+                return rank
+                break
+    def TICFcheck(self,W,testDict,K,TopN,T0,beta):            
+        hit = 0
+        self.K = K
+        self.TopN = TopN
+        self.userNum = len(testDict)
+        self.commandNum = self.TopN*self.userNum
+        for u,i in testDict.items():
+            self.testNum += len(i)
+            CmdRank = self.CommandTICF(W,u,K,TopN,T0,beta)
+            for cmdi ,wi in CmdRank.items():
+                if cmdi in i:
+                    hit += 1
+                    print(u,':',hit)
+        self.hit = hit
+        self.precision = hit/self.commandNum
+        self.recall = hit/self.testNum
+        print("precison:{}".format(self.precision))
+        print("recall:{}".format(self.recall))
+
+    '''7-6TUser_CF算法推荐和评价'''
+    def CommandTUCF(self,W,User,K,TopN,T0,beta):
+        global UserList, ItemList, U_I_TMatrix
+        rank = dict()
+        userIdx = UserList.index(User)
+        havingiIdx = U_I_TMatrix[userIdx,:].nonzero()[0]
+        havingItems = [ItemList[x] for x in havingiIdx]
+        SimuIdx = np.argsort(-W[userIdx,:])[0:K]
+        Uw = W[userIdx,SimuIdx]
+        Iw = 1/(1+beta*abs(T0-U_I_TMatrix[SimuIdx,:]))
+        Iw[U_I_TMatrix[SimuIdx,:]==0] = 0
+        rankW = np.dot(Uw,Iw)
+        for i in np.argsort(-rankW):
+            cmdItem = ItemList[i]
+            if cmdItem not in havingItems:
+                rank[cmdItem] = rankW[i]
+            if len(rank) == TopN:
+                return rank
+                break
+    def TUCFcheck(self,W,testDict,K,TopN,T0,beta):            
+        hit = 0
+        self.K = K
+        self.TopN = TopN
+        self.userNum = len(testDict)
+        self.commandNum = self.TopN*self.userNum
+        for u,i in testDict.items():
+            self.testNum += len(i)
+            CmdRank = self.CommandTUCF(W,u,K,TopN,T0,beta)
+            for cmdi ,wi in CmdRank.items():
+                if cmdi in i:
+                    hit += 1
+                    print(u,':',hit)
+        self.hit = hit
+        self.precision = hit/self.commandNum
+        self.recall = hit/self.testNum
+        print("precison:{}".format(self.precision))
+        print("recall:{}".format(self.recall))
+
+        
+        
+        
+        
+        
+'''8、正式程序'''
+'''8-1准备测试集字典'''
 testDict = dict()
 for u,i,s,t in np.array(testSet):
     if u not in testDict.keys():
         testDict[u] = set()
     if i not in testDict[u]:
         testDict[u].add(i)
-'''正式程序'''
-cmd =   CommandCheck()
-cmd.check(ICF_WMa,testDict,10,10)
+'''8-3调用类'''
+cmd = CommandCheck()
+'''8-3-1ICF结果'''
+cmd.ICFcheck(ICF_WMa,testDict,10,10)
+'''
+precison:0.007880794701986755
+recall:0.07880794701986756
+'''
+
+'''8-3-2UCF结果'''
+cmd.UCFcheck(UCF_WMa,testDict,10,10)
+'''
+precison:0.007963576158940397
+recall:0.07963576158940397
+'''
+
+'''8-3-3随机游走图推荐'''
+
+'''8-3-4最热门推荐'''
+cmd.POPcheck(PopMa,testDict,10)
+'''
+precison:0.001490066225165563
+recall:0.014900662251655629
+'''
+
+'''8-3-5TICF结果'''
+T0 = np.max(U_I_TMatrix)
+cmd.TICFcheck(TICF_WMa,testDict,10,10,T0,0.8)
+'''
+precison:0.006539735099337749
+recall:0.06539735099337748
+'''
+
+'''8-3-6TUCF结果'''
+cmd.TUCFcheck(TUCF_WMa,testDict,10,10,T0,0.8)
+'''
+precison:0.002980132450331126
+recall:0.029801324503311258
+'''
 
 
 
@@ -476,43 +676,6 @@ cmd.check(ICF_WMa,testDict,10,10)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-def command(train,U,W,K):
-    rank = dict()
-    havingItems = train[U]
-    for item in havingItems:
-        for commandItem, wi in sorted(W[item].items(),key=operator.itemgetter(1), reverse=True)[:K]:
-            if commandItem in havingItems:
-                continue
-            if commandItem not in rank.keys():
-                rank[commandItem] = 0
-            rank[commandItem] += 1*wi
-    return rank
-  
-    
-alltestNum = len(testSet)
-allcommandNum = TopN
-def CommandCheck()
 
 
 
