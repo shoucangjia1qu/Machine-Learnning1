@@ -618,10 +618,6 @@ class CommandCheck(object):
         print("recall:{}".format(self.recall))
 
         
-        
-        
-        
-        
 '''8、正式程序'''
 '''8-1准备测试集字典'''
 testDict = dict()
@@ -671,7 +667,89 @@ recall:0.029801324503311258
 '''
 
 
+######################################
+#                                    #
+#       基于社交网络的推荐系统        #
+#                                    #
+######################################
+import numpy as np
+import pandas as pd
+import os
+import matplotlib.pyplot as plt
+import operator
+os.chdir(r"D:\mywork\test\command\social_community")
+'''用户-物品数据'''
+with open("user_artists.dat","r",errors="ignore") as f:
+    content1 = f.readlines()
+U_Idata = np.array([x.split() for x in content1][1:])
+'''用户-朋友数据'''
+with open(r"user_friends.dat","r",errors="ignore") as f:
+    content2 = f.readlines()
+U_Fdata = np.array([x.split() for x in content2][1:])
 
+UserList = list(set(U_F[:,0]))
+ItemList = list(set(U_I[:,1]))
+'''计算用户-物品矩阵'''
+U_IMatrix = np.zeros((len(UserList),len(ItemList)))
+for u, i, w in U_Idata:
+    uIdx = UserList.index(u)
+    iIdx = ItemList.index(i)
+    U_IMatrix[uIdx,iIdx] = 1
+'''计算用户-朋友矩阵'''
+U_FMatrix = np.zeros((len(UserList),len(UserList)))
+for u,f in U_Fdata:
+    uIdx = UserList.index(u)
+    fIdx = UserList.index(f)
+    U_FMatrix[uIdx,fIdx] = 1
+
+def cosDist(v1,v2):
+    return np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
+
+'''1、计算用户熟悉度和相似度'''
+def CalSim(train):
+    global UserList, ItemList
+    row,col = train.shape
+    Sim = np.zeros((row,row))
+    for i in range(row):
+        for j in range(row):
+            if i==j:
+                continue
+            Sim[i,j] = cosDist(train[i,:],train[j,:])
+    return Sim
+SimUF = CalSim(U_FMatrix)
+SimUI = CalSim(U_IMatrix)
+'''2、根据熟悉的用户将喜欢的物品推荐给目标用户'''
+def Command(user,SimUF,SimUI,U_IMatrix,K):
+    global UserList,ItemList
+    rank = dict()
+    '''2-1用户已经喜欢的物品'''
+    uIdx = UserList.index(user)
+    havingiIdx = U_IMatrix[uIdx,:].nonzero()[0]
+    havingItems = [ItemList[x] for x in havingiIdx]
+    '''2-1根据用户之间的熟悉度进行推荐'''
+    SimFriendsIdx = np.argsort(-SimUF[uIdx,:])[:K]
+    SimFriendsMa = SimUF[uIdx,SimFriendsIdx]
+    FriendsItemsMa = U_IMatrix[SimFriendsIdx,:]
+    rankMa = np.dot(SimFriendsMa,FriendsItemsMa)
+    for iIdx in np.argsort(-rankMa):
+        if iIdx in havingiIdx:
+            continue
+        item = ItemList[iIdx]
+        rank[item] = rankMa[iIdx]
+    '''2-2根据用户相似度进行推荐'''
+    SimUserIdx = np.argsort(-SimUI[uIdx,:])[:K]
+    SimUserMa = SimUF[uIdx,SimUserIdx]
+    UserItemsMa = U_IMatrix[SimUserIdx,:]
+    rankMa2 = np.dot(SimUserMa,UserItemsMa)
+    for iIdx in np.argsort(-rankMa2):
+        if iIdx in havingiIdx:
+            continue
+        item2 = ItemList[iIdx]
+        if item2 not in rank.keys():
+            rank[item2] = 0
+        rank[item2] += rankMa2[iIdx]
+    return rank
+cmdRank = Command('22',SimUF,SimUI,U_IMatrix,10)
 
 
 
