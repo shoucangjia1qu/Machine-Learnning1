@@ -752,6 +752,111 @@ def Command(user,SimUF,SimUI,U_IMatrix,K):
 cmdRank = Command('22',SimUF,SimUI,U_IMatrix,10)
 
 
+######################################
+#                                    #
+#        推荐好友离线实验测试         #
+#                                    #
+######################################
+import numpy as np
+import pandas as pd
+import os
+import matplotlib.pyplot as plt
+import operator
+os.chdir(r"D:\mywork\test\command\social_Slashdot")
+
+'''1、读取数据并划分训练集和测试集'''
+with open("Slashdot0902.txt","r") as f:
+    content = f.readlines()
+data = np.array([[int(y) for y in x.split()] for x in content[4:]])
+np.random.seed(1234)
+train = dict()      #用户关注其他用户的集合
+test = dict()       #测试集
+focus = dict()      #用户被其他用户关注的集合
+
+M = 10
+M0 = 0
+for User,focusU in data:
+    if np.random.randint(0,M) == M0:
+        if User not in test.keys():
+            test[User] = set()
+        test[User].add(focusU)
+    else:
+        if User not in train.keys():
+            train[User] = set()
+        train[User].add(focusU)
+        if focusU not in focus.keys():    
+            focus[focusU] = set()
+        focus[focusU].add(User)
+'''2、分别计算相似度，内存不足，无法用array'''
+'''2-1用户a和用户b关注客户集合的相似度'''
+SimOut = dict()
+for userA,AfocusU in train.items():
+    for userB,BfocusU in train.items():
+        if userA==userB:
+            continue
+        if userA not in SimOut.keys():
+            SimOut[userA] = dict()
+        if userB not in SimOut[userA].keys():
+            SimOut[userA][userB] = len(AfocusU&BfocusU)/np.sqrt(len(AfocusU)*len(BfocusU))
+    print(userA)
+
+'''2-2用户a和用户b被关注客户集合的相似度'''
+SimIn = dict()
+for userA, AbefocusU in focus.items():
+    for userB, BbefocusU in focus.items():
+        if userA==userB:
+            continue
+        if userA not in SimIn.keys():
+            SimIn[userA] = dict()
+        if userB not in SimIn[userA].keys():
+            SimIn[userA][userB] = len(AbefocusU&BbefocusU)/np.sqrt(len(AbefocusU)*len(BbefocusU))
+    print(userA)
+
+'''2-3用户a关注的客户集合和用户b被关注客户集合的相似度'''
+SimOutIn = dict()
+for userA,AfocusU in train.items():
+    for userB, BbefocusU in focus.items():
+        if userA==userB:
+            continue
+        if userA not in SimOutIn.keys():
+            SimOutIn[userA] = dict()
+        if userB not in SimOutIn[userA].keys():
+            SimOutIn[userA][userB] = len(AfocusU&BbefocusU)/np.sqrt(len(AfocusU)*len(BbefocusU))
+    print(userA)
+
+'''3、推荐好友'''
+def CommandFriend(u,w,K):
+    rank = dict()
+    friends = train[u]
+    Sim = sorted(w[u].items(), key=operator.itemgetter(1), reverse=True)
+    for f,wf in Sim:
+        if f in friends:
+            continue
+        rank[f] = wf
+        if len(rank) == K:
+            return rank
+            break
+        
+'''4、评价好友推荐效果'''
+def evaluate(test,w,K):
+    allcommand = 0
+    alltest = 0
+    hit = 0
+    for u, testFriends in test.items():
+        try:
+            rank = CommandFriend(u,w,K)
+            alltest += len(testFriends)
+            allcommand += len(rank)
+            for cmdf in rank.keys():
+                if cmdf in testFriends:
+                    hit += 1
+            print('{}已推荐，hit{}'.format(u,hit))            
+        except:
+            print('{}不在其中'.format(u))
+    precision = hit/allcommand
+    recall = hit/alltest
+    print("precision:%.5f;"%precision,"recall:%.5f"%recall)
+        
 
 
 
