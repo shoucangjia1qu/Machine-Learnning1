@@ -799,6 +799,8 @@ for userA,AfocusU in train.items():
         if userB not in SimOut[userA].keys():
             SimOut[userA][userB] = len(AfocusU&BfocusU)/np.sqrt(len(AfocusU)*len(BfocusU))
     print(userA)
+    if len(SimOut)==3000:
+        break
 
 '''2-2用户a和用户b被关注客户集合的相似度'''
 SimIn = dict()
@@ -856,12 +858,9 @@ def evaluate(test,w,K):
     precision = hit/allcommand
     recall = hit/alltest
     print("precision:%.5f;"%precision,"recall:%.5f"%recall)
-        
-
-
-
-
-
+    return precision,recall  
+'''4-1对Out评价，内存原因，关系矩阵只取了前3000个'''
+evaluate(test2,SimOut,10)
 
 
 
