@@ -58,6 +58,22 @@ A = np.dot(np.dot(ExI,xma.T),y)
 b = A[0]
 a = A[1]
 
+'''再另一种计算方法，梯度下降法求解'''
+train = np.ones((len(dataList),2))
+train[:,1] = dataSet[:,0]
+Y = dataSet[:,1].reshape((len(dataList),1))
+alpha = 0.001
+steps = 500
+W = np.ones((2,1))
+for step in range(steps):
+    d = np.dot(train,W)
+    E = Y-d
+    W = W + alpha*np.dot(train.T,E)
+    plt.figure()
+    plt.scatter(x,Y)
+    preY = W[0] + W[1]*train[:,1]
+    plt.plot(x,preY,c='r',linewidth=3)
+    plt.show()
 
 #######################
 #                     #
