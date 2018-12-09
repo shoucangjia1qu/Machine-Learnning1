@@ -78,7 +78,7 @@ for step in range(steps):
 #######################
 #                     #
 #       RBF网络       #
-#                     #
+#     加权线性回归     #
 #######################
 import numpy as np
 import pandas as pd
@@ -128,12 +128,58 @@ plt.plot(dataX[:,1],testY,c='g')
 plt.show()
 
 
+#######################
+#                               #
+#        岭回归                 #
+#   多元线性回归中的共线性问题   #
+#######################
+import numpy as np
+import pandas as pd
+import os
+import matplotlib.pyplot as plt
+os.chdir(r"D:\mywork\test\ML")
+'''1、数据读入'''
+with open("ridgedata.txt","r") as f:
+    content = f.readlines()
+dataList = [[float(y) for y in x.split()] for x in content]
+train = np.array(dataList)[:,:3]
+label = np.array(dataList)[:,-1]
 
+'''2、标准化数据集'''
+def normData(train,label):
+    normLabel = label-np.mean(label)
+    normTrain = (train - np.mean(train,axis=0))/np.var(train,axis=0)
+    return normTrain, normLabel
+normX, normY = normData(train,label)
 
+'''3、最小二乘法求解'''
+m,n = train.shape
+steps=30
+Ws = np.zeros((steps,n))
+Ks = np.zeros((steps,1))
+'''A = (Mx.T*Mx+kI).I*Mx.T*Y'''
+for i in range(steps):
+    k = float(i)/500
+    Ks[i] = k
+    Ex = np.dot(normX.T,normX)
+    kI = k*np.eye(n)
+    if np.linalg.det(Ex+kI) != 0:
+        A = np.dot(np.dot(np.linalg.inv(Ex+kI),normX.T),normY)
+        Ws[i,:] = A
+    else:
+        print("This matrix is singular,connot do inverse")
 
+'''4、画岭迹图'''
+plt.figure()
+plt.plot(Ks,Ws[:,0],c='b')
+plt.plot(Ks,Ws[:,1],c='r')
+plt.plot(Ks,Ws[:,2],c='g')
+plt.annotate("feature[1]",xy = (0,Ws[0,0]),color = 'black')
+plt.annotate("feature[2]",xy = (0,Ws[0,1]),color = 'black')
+plt.annotate("feature[3]",xy = (0,Ws[0,2]),color = 'black')
+plt.show()
 
-
-
+''''''
 
 
 
