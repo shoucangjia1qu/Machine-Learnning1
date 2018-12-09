@@ -128,11 +128,11 @@ plt.plot(dataX[:,1],testY,c='g')
 plt.show()
 
 
-#######################
+#################################
 #                               #
 #        岭回归                 #
 #   多元线性回归中的共线性问题   #
-#######################
+#################################
 import numpy as np
 import pandas as pd
 import os
@@ -179,7 +179,36 @@ plt.annotate("feature[2]",xy = (0,Ws[0,1]),color = 'black')
 plt.annotate("feature[3]",xy = (0,Ws[0,2]),color = 'black')
 plt.show()
 
-''''''
+'''5、对比标准化后的数据集'''
+y = normY
+W = Ws[10,:]
+preY = np.dot(normX,W)
+SSE = np.sqrt(sum(np.power((preY-y),2)))
+x=list(range(len(y)))
+plt.figure()
+plt.plot(x,y,c='b')
+plt.plot(x,preY,c='r',linewidth=3)
+plt.show()
+'''SSE=10.396695072100146'''
+
+
+'''6、还原原始数据集'''
+m,n = train.shape
+Ex = np.dot(train.T,train)
+kI = 0.02*np.eye(n)
+if np.linalg.det(Ex+kI) != 0:
+    W = np.dot(np.dot(np.linalg.inv(Ex+kI),train.T),label)
+else:
+    print("This matrix is singular,connot do inverse")
+y = label
+preY = np.dot(train,W)
+SSE = np.sqrt(sum(np.power((preY-y),2)))
+x=list(range(len(y)))
+plt.figure()
+plt.plot(x,y,c='b')
+plt.plot(x,preY,c='r',linewidth=3)
+plt.show()
+'''SSE=10.337942223356293'''
 
 
 
