@@ -210,27 +210,82 @@ plt.plot(x,preY,c='r',linewidth=3)
 plt.show()
 '''SSE=10.337942223356293'''
 
+#################################
+#                               #
+#        Logistic吸引子         #
+#                               #
+#################################
+import numpy as np
+import pandas as pd
+import os
+import matplotlib.pyplot as plt
+os.chdir(r"D:\mywork\test\ML")
+'''1、画图'''
+def draw(x1,x2,k):
+    plt.figure()
+    plt.plot(x1)
+    plt.plot(x2)
+    plt.title("k=%s"%k)
+    plt.show()
+'''2、logistic映射迭代函数'''
+def logistic_map(k,init):
+    maxIters = 50
+    x = list(range(maxIters))
+    x[0] = init
+    for i in range(maxIters-1):
+        x[i+1] = k*x[i]*(1-x[i])
+    return x
+'''k=0.1'''
+x1 = logistic_map(0.1,0.1)
+x2 = logistic_map(0.1,0.9)
+draw(x1,x2,0.1)
+'''k=0.9'''
+x1 = logistic_map(0.9,0.1)
+x2 = logistic_map(0.9,0.9)
+draw(x1,x2,0.9)
+'''k=1.2'''
+x1 = logistic_map(1.2,0.1)
+x2 = logistic_map(1.2,0.9)
+draw(x1,x2,1.2)
+'''k=2.8'''
+x1 = logistic_map(2.8,0.1)
+x2 = logistic_map(2.8,0.9)
+draw(x1,x2,2.8)
+'''k=3'''
+x1 = logistic_map(3,0.1)
+x2 = logistic_map(3,0.9)
+draw(x1,x2,3)
+'''k=3.5'''
+x1 = logistic_map(3.5,0.1)
+x2 = logistic_map(3.5,0.9)
+draw(x1,x2,3.5)
+'''k=3.6'''
+x1 = logistic_map(3.6,0.1)
+x2 = logistic_map(3.6,0.9)
+draw(x1,x2,3.6)
+'''k=3.8'''
+x1 = logistic_map(3.8,0.1)
+x2 = logistic_map(3.8,0.9)
+draw(x1,x2,3.8)
+'''k=4'''
+x1 = logistic_map(4,0.1)
+x2 = logistic_map(4,0.9)
+draw(x1,x2,4)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+'''绘制k[2,4]的值'''
+maxIters = 1000
+k = np.linspace(2.1,4.0,maxIters)
+klen = len(k)
+xMat = np.zeros((klen,maxIters))
+x = 1/float(maxIters)       #初始值
+for i in range(klen):
+    for j in range(maxIters):
+        x = float(k[i]*x*(1-x))     #指定k后进行迭代
+        xMat[i,j] = x
+'''画图'''
+plt.figure()
+for i in range(klen):
+    plt.scatter(k,xMat[:,i],s=0.1,marker='.')
+plt.show()
 
 
