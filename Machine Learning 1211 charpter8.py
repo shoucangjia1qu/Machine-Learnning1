@@ -7,7 +7,7 @@ Created on Sat Oct 13 17:04:34 2018
 
 import numpy as np
 import pandas as pd
-import os
+import os,copy
 import matplotlib.pyplot as plt
 
 #######################
@@ -39,38 +39,69 @@ def PlattSVM(object):
         self.Labels = OriData[:,2].reshape((len(OriData),1))
     
     '''初始化'''        
-     def initparam(self):
-         m,n = np.shape(self.trainSet)
-         self.alpha = np.zeros((m,1))
-         self.
-        
-    
+    def initparam(self):
+        m,n = np.shape(self.trainSet)
+        self.alpha = np.zeros((m,1))
+        self.eCache = np.zeros((m,2))          #一列为标注误差是否更新，一列是记载的误差
+        self.K = np.zeros(m,m)
+        for k in range(m):
+            self.K[k,:] = self.kernels(self.trainSet,self.trainSet[k,:])
     
     '''构造核函数'''
-    def kernels(self,data):
-        m,n = np.shape(data)
-        self.K = np.zeros(m,m)
-        for i in range(m):
-            A = data[i,:]
-            if list(self.kValue.keys())[0] == "linear":
-                self.K[i,:] = np.dot(data,A.T)
-            elif list(self.kValue.keys())[0] == "Gaussian":
-                x = np.power((data - A),2)
-                Mo = np.sqrt(np.sum(x,axis=1))
-                self.K[i,:] = np.exp(Mo/(-2*self.kValue['Gaussian']**2)
-            else:
-                raise NameError('无法识别的核函数')
-        print("核函数转换完毕")
-    
+    def kernels(self,data,A):
+        if list(self.kValue.keys())[0] == "linear":
+            Ki = np.dot(data,A.T)
+        elif list(self.kValue.keys())[0] == "Gaussian":
+            x = np.power((data - A),2)
+            Mo = np.sqrt(np.sum(x,axis=1))
+            Ki = np.exp(Mo/(-2*self.kValue['Gaussian']**2))
+        else:
+            raise NameError('无法识别的核函数')
+        
+        return Ki
+
     '''计算误差函数'''
     def calEk(self,i):
-        Ek = np.multiply(self.alpha,self,Labels).T*self.K[:,i] + self.b - self.Labels[i,0]      # Yp=W*X+b;E=Yp-Y
+        Ek = np.multiply(self.alpha,self.Labels).T*self.K[:,i] + self.b - self.Labels[i,0]      # Yp=W*X+b;E=Yp-Y
         return Ek
     
+    '''选择子循环的变量'''
+    def chooseJ(self,i,Ei):
+        maxj = 0
+        maxEj = 0
+        maxDeltaE = 0
+        SvmError = np.nonzero(self.eCache[:,0])[0]         #判断当前误差的个数，如果只有一个说明是第一次，就可以随机选取J
+        if len(SvmError)>1:
+            '''目前不止一个误差'''
+            for j in SvmError:
+                if j==i:
+                    continue
+                Ej = self.calEk(i)                   #重新遍历第二个变量的误差
+                deltaE = abs(Ei-Ej)                  #第一个和第二个变量的误差差
+                if deltaE>maxDeltaE:
+                    maxj = j                        #最终选取的第二个变量
+                    maxEj = Ej                      #最终选取的第二个变量的误差
+                    maxDeltaE = deltaE
+            return maxj,maxEj
+        else:
+            '''目前只有一个误差'''
+            while True:
+                j = np.random.randint(0,np.shape(self.trainSet)[0])
+                if j != i :
+                    break
+                Ej = self.calE(i)
+            return j,Ej
     
+    def cutalpha(self,alpha,L,H):
+        if alpha>H:
+            alpha = H
+        if alpha<L:
+            alpha = L
+        return alpha
     
     '''主函数：主循环'''
     def train(self):
+        self.initparam()        #初始化
         m,n = np.shape(self.trainSet)
         step = 0                #循环次数
         flag = True             #主循环标识
@@ -85,7 +116,7 @@ def PlattSVM(object):
                     if (alpha1==0 and y1*Ei<-self.tol) or (alpha1==self.C and y1*Ei>self.tol) or (alpha1>0&alpha1<self.C and y1*Ei!=0):
                         '''(alpha1<self.C and y1*Ei<-self.tol) or (alpha1>0 and y1*Ei>self.tol)'''
                         '''判定是否符合KKT条件，不符合的就进行内循环'''
-                        AlphaChange += self.inner(i)        #内循环返还标识
+                        AlphaChange += self.inner(i,Ei,y1)        #内循环返还标识
                 step+=1
                 if AlphaChange==0:
                     flag = False                            #改变主循环数据集为全量
@@ -95,22 +126,65 @@ def PlattSVM(object):
                     alpha1 = self.alpha[i,0]
                     y1 = self.Labels[i,0]
                     if (alpha1==0 and y1*Ei<-self.tol) or (alpha1==self.C and y1*Ei>self.tol) or (alpha1>0&alpha1<self.C and y1*Ei!=0):
-                        AlphaChange += self.inner(i)        #内循环返还标识
+                        AlphaChange += self.inner(i,Ei)        #内循环返还标识
                     step+=1
                 if AlphaChange>0:
                     flag = True                             #改变主循环数据集为（0，C）
-
+        self.svIdx = np.nonzero(self.alpha>0)[0]            #支持向量的下标
+        self.sptVects = self.trainSet[self.svIdx]           #支持向量
+        self.SVlabels = self.Labels[self.svIdx]             #支持向量的标签
     
-
-
-
-
-
-
-
-
-
-
+    '''主函数：内循环'''
+    def inner(self,i,Ei,y1):
+        j,Ej = self.chooseJ(i,Ei)           #生成第二个变量
+        y2 = self.Labels[j,0]
+        oldAlpha1 = copy.deepcopy(self.alpha[i,0])      #生成旧的第一个alpha
+        oldAlpha2 = copy.deepcopy(self.alpha[j,0])      #生成旧的第二个alpha
+        '''进行剪枝条件的判定'''
+        if y1==y2:
+            L=max(0,oldAlpha1-oldAlpha2)
+            H=min(self.C,self.C+oldAlpha2-oldAlpha1)
+        else:
+            L=max(0,oldAlpha2+oldAlpha1-self.C)
+            H=min(self.C,oldAlpha2+oldAlpha1)
+        if L==H:
+            return 0 
+        '''求解新的alpha变量'''
+        eta = self.K[i,i] + self.K[j,j] - self.K[i,j]
+        if eta<0:
+            return 0
+        '''未剪枝的newAlpha2'''
+        self.alpha[j,0] = oldalpha2 +self.Labels[j,0]*(Ei-Ej)/eta
+        '''选定最终的Alpha2'''
+        self.alpha[j,0] = self.cutalpha(self.alpha[j,0],L,H)
+        '''计算最终的Alpha1'''
+        if abs(oldAlpha2-self.alpha[j,0])<0.0001:
+            print("Alpha2无变化")
+            return 0
+        self.alpha[i,0] = oldAlpha1 + y1*y2*(oldAlpha2-self.alpha[j,0])
+        '''计算最终的误差Ei和Ej'''
+        self.eCache[j] = (1,self.calEk(j))
+        self.eCache[i] = (1,self.calEk[i])
+        '''计算最终的b'''
+        b1 = self.b-Ei-y1*self.K[i,i]*(self.alpha[i,0]-oldAlpha1)-y2*self.K[j,i]*(self.alpha[j,0]-oldAlpha2)
+        b2 = self.b-Ej-y1*self.K[i,j]*(self.alpha[i,0]-oldAlpha1)-y2*self.K[j,j]*(self.alpha[j,0]-oldAlpha2)
+        if (0<self.alpha[i,0]&self.alpha[i,0]<self.C):
+            self.b = b1
+        elif (0<self.alpha[j,0]&self.alpha[j,0]<self.C):
+            self.b = b2
+        else:
+            self.b=(b1+b2)/2
+        return 1
+    
+    '''预测'''
+    def predict(self,testSet):
+        m,n = np.shape(testSet)
+        preLabels = np.zeros([m,1])
+        for i in range(m):
+            sigmaK = self.kernels(self.sptVects,testSet[i,:])
+            preY = np.multiply(self.alpha[self.svIdx],self.SVlabels).T*sigmaK + self.b
+            preLabels[i,0] = np.sign(preY)
+        return preLabels
 
 
 
