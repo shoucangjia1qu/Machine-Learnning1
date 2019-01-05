@@ -32,6 +32,8 @@ from sklearn.preprocessing import KBinsDiscretizer
 Kbox = KBinsDiscretizer(n_bins=4,encode='onehot-dense',strategy='kmeans')    
 #encode中onehot-dense返回密集数组，onehot返回稀疏矩阵，ordinal返回一列
 #strategy中quantile表示等频分箱，uniform表示等量分箱，kmeans表示最接近中心点的分箱
+Kbox.fit_transform(age)
+
 
 '''2、有监督分箱'''
 '''2-1 卡方分箱'''
@@ -131,7 +133,58 @@ IV: 0.5305477313924453
 '''
 
 
-#%%
+#%%无量纲化
+'''1、 归一化(normnalization)，MaxAbsScaler也能实现缩放矩阵（保证矩阵稀疏性，取值[-1,1]）'''
+age = np.random.randint(0,100,size=(100,2))
+'''1-1 sklearn实现，可调用类，也可直接调用minmax_scale方法'''
+from sklearn.preprocessing import MinMaxScaler
+minmax = MinMaxScaler(feature_range=(5,10))
+minmax.fit(age)
+mmdata=minmax.transform(age)            #得出归一化后的数据
+minmax.inverse_transform(mmdata)        #还原归一化前的数据
+
+'''1-2 numpy实现'''
+def minmax(data,feature_range=(0,1)):
+    minRange = feature_range[0]
+    maxRange = feature_range[1]
+    minData = data.min(axis=0)
+    maxData = data.max(axis=0)
+    mmdata = ((data-minData)/(maxData-minData))*(maxRange-minRange) + minRange
+    return mmdata
+mmdata2=minmax(age,feature_range=(5,10))
+
+'''2、标准化'''
+'''2-1 sklearn实现，可调用类，也可直接调用scale方法'''
+from sklearn.preprocessing import StandardScaler
+std = StandardScaler()
+std.fit(age)
+stddata = std.transform(age)            #得出标准化后的数据
+stddata.mean(),stddata.std()
+
+'''2-2 numpy实现'''
+def standard(data):
+    mean = data.mean(axis=0)
+    var = data.std(axis=0)
+    stddata = (data-mean)/var
+    return stddata
+stddata2 = standard(age)
+
+'''3、正则化，可用来计算余弦相似度'''
+from sklearn.preprocessing import Normalizer
+norm = Normalizer(norm='l2')    #默认L2范数
+normdata=norm.fit_transform(age)     
+#余弦相似度(正则化后的)
+cos=np.dot(normdata[0,:],normdata[1,:])
+#余弦相似度(原始数据)
+x1=age[0,:]
+x2=age[1,:]
+cos2 = np.dot(x1,x2)/(np.linalg.norm(x1)*np.linalg.norm(x2))
+
+
+#%%独热编码
+
+
+
 
 
 
