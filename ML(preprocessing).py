@@ -25,15 +25,17 @@ pd.qcut(pd_age['age'],4,retbins=True,labels=['A','B','C','D'])      #指定划�
 '''1-3 sklearn实现二分类分箱'''
 from sklearn.preprocessing import Binarizer
 box = Binarizer(threshold=60)               #threshold是二分类的划分界限
+box.fit(age)
 box.fit_transform(age)
 
 '''1-4 sklearn实现多分类分箱'''
 from sklearn.preprocessing import KBinsDiscretizer
-Kbox = KBinsDiscretizer(n_bins=4,encode='onehot-dense',strategy='kmeans')    
+Kbox = KBinsDiscretizer(n_bins=4,encode='ordinal',strategy='kmeans')    
 #encode中onehot-dense返回密集数组，onehot返回稀疏矩阵，ordinal返回一列
 #strategy中quantile表示等频分箱，uniform表示等量分箱，kmeans表示最接近中心点的分箱
+Kbox.fit(age)
 Kbox.fit_transform(age)
-
+Kbox.bin_edges_             #查看分类边界
 
 '''2、有监督分箱'''
 '''2-1 卡方分箱'''
@@ -181,14 +183,56 @@ x2=age[1,:]
 cos2 = np.dot(x1,x2)/(np.linalg.norm(x1)*np.linalg.norm(x2))
 
 
-#%%独热编码
+#%%编码
+data1=[["A","B"][np.random.randint(0,2)] for i in range(20)]
+data2=[["C","A","B"][np.random.randint(0,3)] for i in range(20)]
+data3=[["D","E","F"][np.random.randint(0,3)] for i in range(20)]
+data=np.array([data1,data2,data3]).T
+
+'''1、标签编码，有顺序意义，适用于一维数据'''
+from sklearn.preprocessing import LabelEncoder
+labelencode = LabelEncoder()
+labelencode.fit(data.reshape(20))
+labeldata=labelencode.transform(data)       #得到切分后的数据
+labelencode.classes_                        #查看分类标签
+labelencode.inverse_transform(labeldata)    #还原编码前数据
+
+'''2、普通编码，有顺序意义的分类变量，适用于二维数据'''
+from sklearn.preprocessing import OrdinalEncoder
+oriencode = OrdinalEncoder(categories='auto')
+oriencode.fit(data)
+oridata=oriencode.transform(data)           #编码后的数据
+oriencode.categories_                       #查看分类标签
+oriencode.inverse_transform(oridata)        #还原编码前数据
 
 
+'''3、独热编码，无顺序含义的分类变量可以稀疏化特征矩阵'''
+'''3-1 sklearn实现'''
+from sklearn.preprocessing import OneHotEncoder
+onehotencode = OneHotEncoder(categories='auto',handle_unknown='ignore')
+onehotencode.fit(data)
+onehotdata=onehotencode.transform([['B','C','D']]).toarray()    #得到独热编码的数据
+newFeatureName = onehotencode.get_feature_names()               #得到新的标签
+onehotencode.inverse_transform(onehotdata)                      #还原编码前数据
+#onehotencode.n_values()
+'''参数要点：
+handle_unknown:"error"和"ignore"，遇到未知类别是报错或者忽略
+sparse:是否稀疏，否的话就不用toarray()
+n_values:指定特征列的维度，要求连续时会自动补齐,[2,3,4]，且好像只能用于数值
+categorical_features:指定需要转换的特征列，[0,2] == [True,False,True]，
+                     会自动handle_unknown，且好像只能用于数值
+'''
 
-
-
-
-
+'''3-2 pandas实现'''
+pd.get_dummies(pd.DataFrame(data),columns=[0,2],prefix=['数据1','data2'],
+               prefix_sep=[",","_"])
+'''参数要点：
+drop_first:是否删除第一列，相当于N-1列
+dummy_na:是否多一列显示Nan
+prefix:标签分隔主名称
+prefix_sep:标签分隔符
+columns:指定需要编码的列
+'''
 
 
 
