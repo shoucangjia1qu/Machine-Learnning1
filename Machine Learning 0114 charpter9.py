@@ -179,6 +179,7 @@ data = [[float(x) for x in row.split()] for row in file]
 data = np.array(data)
 train = data[:,:-1]
 label = data[:,-1].reshape(-1,1)
+label[label==0] = -1
 
 '''AdaBoost训练'''
 def AdaBoostTrain(dataSet,label,iters=50):
@@ -199,7 +200,7 @@ def AdaBoostTrain(dataSet,label,iters=50):
         D = D/D.sum()
         '''5、最终错分个数和错分率，如果错分为0，则结束循环，否则继续'''
         aggValue += alpha*bestprelabel
-        agglabel = np.sign(aggValue)/2 + 0.5
+        agglabel = np.sign(aggValue)
         errorNum = sum(agglabel!=label)[0];eRate = errorNum/m
         print(errorNum,eRate)
         if errorNum == 0:
@@ -221,7 +222,7 @@ def decisionTree(dataSet,label,D):
         columnMin = dataSet[:,i].min()
         stepLength = (columnMax-columnMin)/steps
         '''内循环：迭代每个步长'''
-        for j in range(-1,steps+1):
+        for j in range(0,steps+1):
             threshold = columnMin+float(j)*stepLength       #阀值
             '''判断小于0的是0，还是大于0的是0'''
             for operator in ['lt','gt']:
@@ -243,11 +244,11 @@ def splitDataSet(dataSet,column,threshold,operator):
     prelabel = np.ones((dataSet.shape[0],1))
     '''小于阈值的分类为0'''
     if operator=="lt":
-        prelabel[dataSet[:,column]<=threshold] = 0
+        prelabel[dataSet[:,column]<=threshold] = -1
     
     else:       
         '''大于阈值的分类为0'''
-        prelabel[dataSet[:,column]>=threshold] = 0
+        prelabel[dataSet[:,column]>=threshold] = -1
     return prelabel
 
 
