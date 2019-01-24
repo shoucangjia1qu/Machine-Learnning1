@@ -336,11 +336,20 @@ PostiveIdx = np.nonzero(trainLabel==1)[0]
 for idx in PostiveIdx:
     threshold = aggValue1D[idx]
     Num = sum((aggValue1D<=threshold)*(trainLabel==0))
+    print(Num,idx)
     AUCnum += Num
 AUC = AUCnum/(Pnum*Nnum)
 AUC = metrics.roc_auc_score(trainLabel,aggValue1D)
 print("AUC:{}".format(AUC))
-AUC:0.8550468938620114
+
+AUCnum = 0
+zeroNum = 0
+for idx in aggValueIdx:
+    if trainLabel[idx] == 0:
+        zeroNum += 1
+    else:
+        AUCnum += zeroNum
+        print(zeroNum,idx)
 
 
 '''第三种:调用sklearn'''
@@ -355,4 +364,44 @@ plt.show()
 AUC = metrics.roc_auc_score(testLabel,testaggValue)
 AUC = metrics.auc(fpr,tpr)
 '''AUC:0.8069148936170212'''
+
+#######################
+#                     #
+#     PCA主成分分析    #
+#                     #
+#######################
+import numpy as np
+import pandas as pd
+from sklearn import preprocessing
+from sklearn.decomposition import PCA
+import os
+os.chdir(r"D:\mywork\test")
+
+'''自编PCA求特征值和特征向量'''
+def PCAself(dataSet,K):
+    m,n = np.shape(dataSet)
+    C = np.dot(dataSet.T,dataSet)/(m-1)         #求协方差矩阵
+    feaValue, feaVect = np.linalg.eig(C)        #求特征值和特征向量
+    return feaValue[:K], feaVect[:,:K]
+X = np.array([[10, 15, 29],
+                        [15, 46, 13],
+                        [23, 21, 30],
+                        [11, 9,  35],
+                        [42, 45, 11],
+                        [9,  48, 5],
+                        [11, 21, 14],
+                        [8,  5,  15],
+                        [11, 12, 21],
+                        [21, 20, 25]])
+Xstd = X-X.mean(axis=0)
+Xstd2 = Xstd/X.std(axis=0)
+feaValue, feaVect = PCAself(Xstd2,2)        #特征值、特征向量
+newX = np.dot(Xstd2,feaVect)                #降维后的数据
+'''sklearn中的PCA'''
+pca = PCA(n_components=2)
+clf = pca.fit(Xstd2)
+feaValue2 = clf.explained_variance_         #特征值
+feaVect2 = clf.components_.T                #特征向量
+newX2 = clf.transform(Xstd2)                #降维后的数据
+
 
