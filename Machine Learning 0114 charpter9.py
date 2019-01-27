@@ -382,26 +382,110 @@ def PCAself(dataSet,K):
     m,n = np.shape(dataSet)
     C = np.dot(dataSet.T,dataSet)/(m-1)         #求协方差矩阵
     feaValue, feaVect = np.linalg.eig(C)        #求特征值和特征向量
-    return feaValue[:K], feaVect[:,:K]
-X = np.array([[10, 15, 29],
-                        [15, 46, 13],
-                        [23, 21, 30],
-                        [11, 9,  35],
-                        [42, 45, 11],
-                        [9,  48, 5],
-                        [11, 21, 14],
-                        [8,  5,  15],
-                        [11, 12, 21],
-                        [21, 20, 25]])
+    feaIdx = np.argsort(-feaValue)
+    Idx = feaIdx[:K]
+    return feaValue[Idx], feaVect[:,Idx]
+
+X = np.random.randint(1,100,(10,3))
 Xstd = X-X.mean(axis=0)
 Xstd2 = Xstd/X.std(axis=0)
-feaValue, feaVect = PCAself(Xstd2,2)        #特征值、特征向量
+feaValue, feaVect = PCAself(Xstd2,3)        #特征值、特征向量
 newX = np.dot(Xstd2,feaVect)                #降维后的数据
+
 '''sklearn中的PCA'''
-pca = PCA(n_components=2)
+pca = PCA(n_components=400)
 clf = pca.fit(Xstd2)
 feaValue2 = clf.explained_variance_         #特征值
 feaVect2 = clf.components_.T                #特征向量
 newX2 = clf.transform(Xstd2)                #降维后的数据
+
+
+#######################
+#                     #
+#       人脸识别       #
+#                     #
+#######################
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn import preprocessing
+from sklearn.decomposition import PCA
+import os
+import PIL.Image as Image
+
+'''1、读取数据集'''
+def loadimages(path):
+    dataX = []
+    dataY = []
+    classLabel = 0
+    for subdir,dirname,filenames in os.walk(path):
+        for subdirname in dirname:
+            subpath = subdir+"\\"+subdirname
+            for file in os.listdir(subpath):
+#                im = Image.open(subpath+"\\"+file)
+                im = Image.open(os.path.join(subpath,file))
+                im.convert("L")         #转成Long
+                dataX.append(np.asarray(im, dtype=np.uint8))        #转成uint8数组
+                dataY.append(classLabel)
+            classLabel += 1
+    return dataX,dataY
+
+'''2、转成一维数组并构成矩阵'''
+def genRowMatrix(data):
+    dataSet = np.zeros((1,data[0].size), dtype=data[0].dtype)
+    for row in data:
+        dataSet = np.vstack((dataSet,row.reshape(1,-1)))
+    return dataSet[1:,:]
+
+'''3、距离公式'''
+def dist(VecA,VecB,types="L2"):
+    if types == "L2":           #欧式距离
+        return (np.linalg.norm((VecA-VecB))+0.0)
+    elif types == "cos":        #夹角余弦
+        return np.dot(VecA,VecB)/(np.linalg.norm(VecA)*np.linalg.norm(VecB)+0.0)
+
+'''4、先直接调用sklearn中的PCA'''
+def sklearnPCA(dataSet,k=10):
+    pca = PCA(n_components=k)
+    clf = pca.fit(dataSet)
+    feaValue = clf.explained_variance_         #特征值
+    feaVect = clf.components_.T                #特征向量
+    newData = clf.transform(dataSet)           #降维后的数据
+    return feaValue,feaVect,newData
+
+'''5、测试，预测图片类别'''
+'''5-1 取数'''
+path="D:\\mywork\\test\\ML\\郑捷《机器学习算法原理与编程实践》第2-9章节的源代码及数据集\\PCA\\att"
+dataX,dataY = loadimages(path)
+testX = dataX[30]
+'''5-2 数据标准化'''
+dataSet = genRowMatrix(dataX)
+Xmean = np.mean(dataSet,axis=0)
+Xstd = np.std(dataSet,axis=0)
+StdData = (dataSet-Xmean)/Xstd
+'''5-3 求特征值、特征向量、新的数据矩阵'''
+feaValue,feaVect,newData = sklearnPCA(StdData)
+#newData2 = np.dot(StdData,feaVect)
+'''5-4 计算测试集投影，并预测图片类别'''
+minClass = -1
+minDist = np.inf
+StdTest = (testX.reshape(1,-1)-Xmean)/Xstd
+feaTest = np.dot(StdTest,feaVect)[0]
+m,n = np.shape(newData)
+for i in range(m):
+    distance = dist(feaTest,newData[i,:])
+    if distance<minDist:
+        minDist = distance
+        minClass = dataY[i]
+print("原类别为：{}".format(dataY[30]))
+print("预测类别：{},距离：{}".format(minClass,minDist))
+
+'''5-5 画出特征脸'''
+
+
+
+
+
+
 
 
