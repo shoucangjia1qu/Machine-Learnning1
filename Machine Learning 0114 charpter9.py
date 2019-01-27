@@ -480,12 +480,27 @@ for i in range(m):
 print("原类别为：{}".format(dataY[30]))
 print("预测类别：{},距离：{}".format(minClass,minDist))
 
-'''5-5 画出特征脸'''
+'''5-5-1 画出特征脸，特征脸的平均数'''
+label = np.array(dataY)
+faceNum = len(set(dataY))
+featureFace = np.zeros((faceNum,dataSet.shape[1]))
+featureImages = []
+for i in set(dataY):
+    idx = np.nonzero(label==i)[0]
+    oneFace = np.mean(dataSet[idx], axis=0)
+    featureFace[i,:] = oneFace.copy()
+for i in range(faceNum):
+    featureImages.append(featureFace[i,:].reshape(112,92))
 
-
-
-
-
+'''5-5-2 画出特征脸'''
+plt.figure(figsize=(10,10))
+for i in range(len(featureImages)):
+    plt.subplot(10,4,i+1)
+#    plt.imshow(featureImages[i])
+    plt.imshow(featureImages[i], cmap="gray")
+    plt.xticks([]);plt.yticks([])           #隐藏坐标轴
+#plt.text(5,5,"feature Faces", horizontalalignment='center')
+plt.show()
 
 
 
