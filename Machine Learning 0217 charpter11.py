@@ -73,8 +73,22 @@ def vertibi(observeResult,startP,transformP,observeP,stateArray,observeArray):
     print(state,stateP)
 
 
-
-
+#######################
+#                     #
+#     HMM词性标注      #
+#                     #
+#######################
+import jieba
+'''不带词性'''
+sen = jieba.cut("把这篇报道修改一下")
+for x in sen:
+    print(x)
+    
+'''带词性'''
+import jieba.posseg
+sen2 = jieba.posseg.cut("把这篇报道修改一下")
+for i in sen2:
+    print(i.word,i.flag)
 
 
 
