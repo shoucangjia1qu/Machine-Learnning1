@@ -92,7 +92,7 @@ preY1 = LM.preY
 loss1 = LM.sqrLoss
 #梯度下降方法
 LM = linearM()
-LM.trainGd(X,Y,0.07,2000)
+LM.trainGd(X,Y,0.05,5000)
 w2 = LM.w
 b2 = LM.b
 preY2 = LM.preY
@@ -104,4 +104,93 @@ w3 = LM.w
 b3 = LM.b
 preY3 = LM.preY
 loss3 = LM.sqrLoss
+
+#Logit回归
+import numpy as np
+import pandas as pd
+import os
+import matplotlib.pyplot as plt
+
+os.chdir("D:\\mywork\\test")
+#1、数据集
+with open(r"D:\mywork\test\ML\dataSet_BP.txt",'r') as f:
+    content=f.readlines()
+dataList = [[float(i) for i in row.split()] for row in content]
+dataArray = np.array(dataList)
+train = dataArray[:,:2]
+#调整样本分类
+label = np.ones(train.shape[0])
+for i in range(307):
+    if train[i,1]<train[i,0]*1.28+3:
+        label[i] = 0
+#label[np.nonzero(train[:,1]<10)[0]] = 0
+
+#2、梯度下降法和牛顿法解决逻辑斯蒂回归最大似然估计问题
+class logit(object):
+    #属性
+    def __init__(self):
+        self.w = 0
+        self.preY = 0
+        self.trainSet = 0
+        
+    #训练，梯度下降法
+    def trainGd(self,X,Y,r,steps):
+        m,n = np.shape(X)
+        w = np.ones((1,n))
+        errorList = []
+        for i in range(steps):
+            wx = np.dot(X,w.T)
+            p = np.exp(wx)/(1+np.exp(wx))
+            err = p - Y.reshape(-1,1)
+            gra = np.sum(np.multiply(X,err) ,axis=0)
+            w = w - r*gra/m
+            errorList.append(err.sum())
+        self.w = w
+        self.preY = p
+        self.trainSet = X
+        self.errorList = errorList
+
+X = np.hstack(( train, np.ones((train.shape[0],1)) ))
+#开始训练：梯度下降法
+lg = logit()
+lg.trainGd(X,label,0.08,2000)
+w1 = lg.w
+pre1 = lg.preY
+error1 = lg.errorList
+#画图1（分类图）
+Idx0 = np.nonzero(label==0)[0]
+Idx1 = np.nonzero(label==1)[0]
+plt.scatter(X[Idx0,0], X[Idx0,1], c='r',marker='^')
+plt.scatter(X[Idx1,0], X[Idx1,1], c='b',marker='o')
+Xre = np.linspace(-5,15,100)
+Yre = -(w1[0,2]+Xre*w1[0,0])/w1[0,1]
+plt.plot(Xre,Yre) 
+plt.show()
+#画图2（误差图）
+plt.plot(error1,range(2000))
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
