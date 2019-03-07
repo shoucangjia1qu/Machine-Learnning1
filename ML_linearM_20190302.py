@@ -149,6 +149,29 @@ class logit(object):
         self.preY = p
         self.trainSet = X
         self.errorList = errorList
+    
+    #训练，牛顿法
+    def trainNt(self,X,Y,steps):
+        m,n = np.shape(X)
+        w = np.ones((1,n))
+        errorList = []
+        for i in range(steps):
+            wx = np.dot(X,w.T)
+            p = np.exp(wx)/(1+np.exp(wx))
+            err = p - Y.reshape(-1,1)
+            gra = np.sum(np.multiply(X,err) ,axis=0)
+            Hx = np.zeros((n,n))
+            for j in range(m):
+                xxt = np.dot(X[j,:].reshape(-1,1),X[j,:].reshape(1,-1))
+                Hx += xxt*p[j]*(1-p[j])
+#            Hx = np.dot(np.dot(np.dot(X.T,np.diag(p.reshape(m))),np.diag(1-p.reshape(m))),X)
+            w = w - np.dot(gra,np.linalg.inv(Hx)/m)
+            errorList.append(err.sum())
+        self.w = w
+        self.preY = p
+        self.trainSet = X
+        self.errorList = errorList
+    
 
 X = np.hstack(( train, np.ones((train.shape[0],1)) ))
 #开始训练：梯度下降法
@@ -157,6 +180,14 @@ lg.trainGd(X,label,0.08,2000)
 w1 = lg.w
 pre1 = lg.preY
 error1 = lg.errorList
+
+#开始训练：牛顿法
+lg = logit()
+lg.trainNt(X,label,2000)
+w2 = lg.w
+pre2 = lg.preY
+error2 = lg.errorList
+
 #画图1（分类图）
 Idx0 = np.nonzero(label==0)[0]
 Idx1 = np.nonzero(label==1)[0]
@@ -167,9 +198,8 @@ Yre = -(w1[0,2]+Xre*w1[0,0])/w1[0,1]
 plt.plot(Xre,Yre) 
 plt.show()
 #画图2（误差图）
-plt.plot(error1,range(2000))
+plt.plot(range(2000),error1)
 plt.show()
-
 
 
 
