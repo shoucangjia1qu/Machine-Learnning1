@@ -201,26 +201,107 @@ plt.show()
 plt.plot(range(2000),error1)
 plt.show()
 
+######西瓜书课后练习
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import os
 
 
+dataSet = [
+        ['青绿', '蜷缩', '浊响', '清晰', '凹陷', '硬滑', 0.697, 0.460, '好瓜'],
+        ['乌黑', '蜷缩', '沉闷', '清晰', '凹陷', '硬滑', 0.774, 0.376, '好瓜'],
+        ['乌黑', '蜷缩', '浊响', '清晰', '凹陷', '硬滑', 0.634, 0.264, '好瓜'],
+        ['青绿', '蜷缩', '沉闷', '清晰', '凹陷', '硬滑', 0.608, 0.318, '好瓜'],
+        ['浅白', '蜷缩', '浊响', '清晰', '凹陷', '硬滑', 0.556, 0.215, '好瓜'],
+        ['青绿', '稍蜷', '浊响', '清晰', '稍凹', '软粘', 0.403, 0.237, '好瓜'],
+        ['乌黑', '稍蜷', '浊响', '稍糊', '稍凹', '软粘', 0.481, 0.149, '好瓜'],
+        ['乌黑', '稍蜷', '浊响', '清晰', '稍凹', '硬滑', 0.437, 0.211, '好瓜'],
+        ['乌黑', '稍蜷', '沉闷', '稍糊', '稍凹', '硬滑', 0.666, 0.091, '坏瓜'],
+        ['青绿', '硬挺', '清脆', '清晰', '平坦', '软粘', 0.243, 0.267, '坏瓜'],
+        ['浅白', '硬挺', '清脆', '模糊', '平坦', '硬滑', 0.245, 0.057, '坏瓜'],
+        ['浅白', '蜷缩', '浊响', '模糊', '平坦', '软粘', 0.343, 0.099, '坏瓜'],
+        ['青绿', '稍蜷', '浊响', '稍糊', '凹陷', '硬滑', 0.639, 0.161, '坏瓜'],
+        ['浅白', '稍蜷', '沉闷', '稍糊', '凹陷', '硬滑', 0.657, 0.198, '坏瓜'],
+        ['乌黑', '稍蜷', '浊响', '清晰', '稍凹', '软粘', 0.360, 0.370, '坏瓜'],
+        ['浅白', '蜷缩', '浊响', '模糊', '平坦', '硬滑', 0.593, 0.042, '坏瓜'],
+        ['青绿', '蜷缩', '沉闷', '稍糊', '稍凹', '硬滑', 0.719, 0.103, '坏瓜']
+    ]
+#特征值列表
+labels = ['色泽', '根蒂', '敲击', '纹理', '脐部', '触感', '密度', '含糖率']
+#整理出数据集和标签
+X = np.array(dataSet)[:,6:8]
+X=X.astype(float)
+Y = np.array(dataSet)[:,8]
+Y[Y=="好瓜"]=1
+Y[Y=="坏瓜"]=0
+Y=Y.astype(int)
+
+#对数几率分类器
+class logit(object):
+    #属性
+    def __init__(self):
+        self.w = 0
+        self.label = 0
+        self.trainSet = 0
+        self.errorList = 0
+    
+    #方法：对数几率预测函数
+    def prelogit(self,wx):
+        return 1/(1+np.exp(-wx))
+
+    #方法：牛顿法迭代参数
+    def trainNw(self,X,Y,steps):
+        errorList = []
+        Y2 = Y.reshape(-1,1)
+        m,n = np.shape(X)
+        X2 = np.hstack((X,np.ones((m,1))))
+        w = np.ones((1,n+1))
+        for i in range(steps):
+            wx = np.dot(X2,w.T)         #内积
+            Gx = np.dot((self.prelogit(wx)-Y2).T,X2)        #梯度
+            Hx = np.dot(np.multiply(X2,self.prelogit(wx)*(1-self.prelogit(wx))).T,X2)       #二阶梯度
+            w -= np.dot(Gx,np.linalg.inv(Hx))        #迭代参数
+            error = np.sum(self.prelogit(wx)-Y2)        #错误率
+            errorList.append(error)
+            if abs(error) < 0.000001:           #判断是否退出
+                break
+        self.w = w
+        self.trainSet = X
+        self.label = Y
+        self.errorList = errorList
+
+#训练        
+lg = logit()
+lg.trainNw(X,Y,10)
+error = lg.errorList
+w = lg.w
+#画图
+a=-w[0,0]/w[0,1]    #斜率
+b=-w[0,2]/w[0,1]     #截距
+plt.scatter(X[Y==1,0],X[Y==1,1],c='b',marker='+')
+plt.scatter(X[Y==0,0],X[Y==0,1],c='r',marker='d')
+plt.plot(np.linspace(0,0.8,10),a*np.linspace(0,0.8,10)+b)
+plt.show()
 
 
+#换成梯度下降试试
+m,n = np.shape(X2)
+w = np.ones((1,3))
+errorList = []
+for i in range(5000):
+    wx = np.dot(X2,w.T)
+    p = np.exp(wx)/(1+np.exp(wx))
+    err = p - Y.reshape(-1,1)
+    gra = np.sum(np.multiply(X2,err) ,axis=0)
+    w = w - 0.8*gra/m
+    errorList.append(err.sum())
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#预测和评价
+preLogit = lg.prelogit(np.dot(X2,w.T))
+preY = np.copy(preLogit)
+preY[preY>=0.5]=1
+preY[preY<0.5]=0
+from sklearn import metrics
+print(metrics.classification_report(Y,preY))
 
