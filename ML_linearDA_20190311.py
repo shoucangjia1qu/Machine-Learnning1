@@ -19,13 +19,18 @@ train = np.array(df.iloc[:,1:])
 
 #直接sklearn实现LDA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-lda = LDA()   #选取两个主成分
-lda.fit(data,label)
-X = lda.transform(data)
-lda.explained_variance_ratio_
+lda = LDA(solver="eigen")   #选取两个主成分
+lda.fit(train,label)
+newX2 = lda.transform(train)                #降维后的新数据
+lda.explained_variance_ratio_              #特征值的权重
 '''array([0.68747889, 0.31252111])'''
+lda.means_                                 #每一类的均值
+lda.xbar_  
+lda.scalings_                            
 #降维后画图
-plt.scatter(X[:,0],X[:,1])
+plt.scatter(newX2[label==1,0],newX2[label==1,1],c='r',marker='+')
+plt.scatter(newX2[label==2,0],newX2[label==2,1],c='b',marker='o')
+plt.scatter(newX2[label==3,0],newX2[label==3,1],c='g',marker='D')
 plt.show()
 
 
@@ -36,37 +41,59 @@ class Linerda(object):
         self.w = 0
         self.n_components = 0
         self.ratio = 0
+        self.Miui = 0
+        self.Sw = 0
+        self.Sb = 0
+        self.newX = 0
         
     #2、数据标准化
     def scale(self,trainSet):
         return (trainSet-trainSet.mean(axis=0))/trainSet.std(axis=0)
     
     #3、进行降维
-    def train(self,x,y):
-        data = self.scale(x)
+    def train(self,X,Y):
         Sb = 0          #类间散度
         Sw = 0          #类内散度
-        Miu = np.mean(data,axis=0)       #总体平均数
-        ylabel = set(y)
+        Miui = []       #平均每类的均值
+        Miu = np.mean(X,axis=0)       #总体平均数
+        ylabel = set(Y)
         for i in ylabel:
-            Xi = data[np.nonzero(y==i)[0]]
-            Miui =  np.mean(Xi,axis=0)
-            Swi = np.dot((Xi-Miui).T,(Xi-Miui))/(len(Xi)-1)
+            Xi = X[Y==i,:]
+            u =  np.mean(Xi,axis=0)
+            Miui.append(u)
+            Swi = np.dot((Xi-u.reshape(1,-1)).T,(Xi-u.reshape(1,-1)))
             Sw += Swi
-            Sbi = len(Xi)*np.dot((Miui-Miu).reshape(1,-1).T,(Miui-Miu).reshape(1,-1))
+            Sbi = len(Xi)*np.dot((u-Miu).reshape(1,-1).T,(u-Miu).reshape(1,-1))
             Sb += Sbi
         U,S,V = np.linalg.svd(Sw)
-        #选取2个变量
-        w = np.dot(Sb,np.dot(np.dot(V.T[:,:2],np.diag(S[:2])),U.T[:2,:2]))
+        Sn = np.linalg.inv(np.diag(S))
+        Swn = np.dot(np.dot(V.T,Sn),U.T)
+        SwnSb = np.dot(Swn,Sb)
+        la,F = np.linalg.eig(SwnSb)         #特征值和特征向量
+        la = np.real(la)
+        F = np.real(F)
+        laIdx = np.argsort(-la)             #特征值下标从大到小排序
+        choosela = la[laIdx[0:len(ylabel)-1]]   #选取前N-1个特征值
+        w = F[:,laIdx[0:len(ylabel)-1]]         #选取最终的特征向量
+        self.w = w
+        self.n_components = len(ylabel)-1
+        self.ratio = choosela/np.sum(choosela)
+        self.Miui = Miui
+        self.Sw = Sw
+        self.Sb = Sb
+        self.newX = np.dot(X,w)
 
-X=np.dot(data,w)
-
-plt.scatter(X[label==1,0],X[label==1,1],c='r')
-plt.scatter(X[label==2,0],X[label==2,1],c='b')
-plt.scatter(X[label==3,0],X[label==3,1],c='y')
+Ld = Linerda()
+Ld.train(train,label)
+w=Ld.w
+newX=Ld.newX
+ratio=Ld.ratio
+Miui=Ld.Miui
+#降维后画图
+plt.scatter(newX[label==1,0],newX[label==1,1],c='r',marker='+')
+plt.scatter(newX[label==2,0],newX[label==2,1],c='b',marker='o')
+plt.scatter(newX[label==3,0],newX[label==3,1],c='g',marker='D')
 plt.show()
-
-
 
 ######西瓜书3.5课后习题
 dataSet = [
@@ -98,7 +125,9 @@ Y[Y=="好瓜"]=1
 Y[Y=="坏瓜"]=0
 Y=Y.astype(float)
 
-#二分类问题
+
+
+#二分类问题，课后习题3.5
 #1、计算类内散度
 def calSw(X,Y):
     Sw = 0
@@ -133,12 +162,12 @@ for i in range(17):
     Xnew[i,0]=x0
     Xnew[i,1]=y0
 #或者另一种算法#
-Xnew2 = np.zeros((17,2))
+Xnew = np.zeros((17,2))
 for i in range(17):
     x0 = np.dot(X[i,:],w)*w[0]/np.power(np.linalg.norm(w),2)
     y0 = x0*a
-    Xnew2[i,0]=x0
-    Xnew2[i,1]=y0
+    Xnew[i,0]=x0
+    Xnew[i,1]=y0
 
 #6、画图
 plt.figure(figsize=(8,6))
@@ -179,8 +208,7 @@ for i in range(17):
         plt.plot([X[i,0],Xnew[i,0]],[X[i,1],Xnew[i,1]],'g--')
     else:
         plt.plot([X[i,0],Xnew[i,0]],[X[i,1],Xnew[i,1]],'r--')
-plt.scatter([Xnew[Y==1,0].mean(),Xnew[Y==0,0].mean()],[Xnew[Y==1,1].mean(),Xnew[Y==0,1].mean()],c='y',marker='D',linewidths=10)
+#plt.scatter([Xnew[Y==1,0].mean(),Xnew[Y==0,0].mean()],[Xnew[Y==1,1].mean(),Xnew[Y==0,1].mean()],c='y',marker='D',linewidths=10)
 plt.show()
-
 
 
