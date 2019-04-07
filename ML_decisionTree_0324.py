@@ -89,7 +89,7 @@ class EntTree(object):
             x = x[:,columnIndex]
         #判断是分类还是连续变量
         xValue = np.unique(x)
-        if len(xValue) <= 3:
+        if len(xValue) <= 2:
             ##计算各属性的样本占比
             Di = [sum(x==value)/len(x) for value in xValue]
             ##计算各属性对应样本的信息熵
@@ -286,27 +286,43 @@ class EntTree(object):
                 marker += 1
         if marker == 0:             #是叶节点
             #复制剪枝前树
+            print('子树是：',tree)
             preTree = copy.deepcopy(self.treeDict)
+            print('不剪枝树')
+            print(self.treeDict)
             #将新的树的叶子节点去掉
             preTree = self.__api(preTree,treeIndex,self.__chooseLabel(y),n=0)
+            print('剪枝树')
+            print(preTree)
             #判断是否需要剪枝
             pruningSign = self.__pruning(self.testX, self.testY, preTree, self.treeDict)
             if pruningSign==1:      #剪枝，返回节点分类
                 self.treeDict = preTree
+                print('剪枝')
+                print('返回{}'.format(self.__chooseLabel(y)))
                 return self.__chooseLabel(y)
             else:                   #不剪枝，返回原树结构
+                print('不剪枝')
+                print('返回{}'.format(tree))
                 return tree
         else:                       #是子节点，继续寻找叶节点
             treeIndex.append(node)
+            print('增加',node)
             for nodeValue, subtree in tree[node].items():
                 #对于子节点进行递归
                 if isinstance(subtree,dict):
                     treeIndex.append(nodeValue)
+                    print('增加',nodeValue)
                     #判断是分类还是连续变量
-                    marker, nodeValue = nodeValue.split('/') if isinstance(nodeValue, str) else None, nodeValue
-                    subx, suby = self.__splitDataset(x, y, labels.index(node), float(nodeValue), marker)
+                    marker, Value = nodeValue.split('/') if isinstance(nodeValue, str) else None
+                    subx, suby = self.__splitDataset(x, y, labels.index(node), float(Value), marker)
+                    print('树结构是：')
+                    print(tree)
                     tree[node][nodeValue] = self.__afterpruning(subx, suby, subtree, treeIndex)
+                    print('树节点是：',tree[node][nodeValue],';;;树结构是：{}'.format(tree))
+                    print('删除:',treeIndex[-1])
                     del treeIndex[-1]       #删除节点属性值
+            print('删除：',treeIndex[-1])
             del treeIndex[-1]               #删除节点
         return tree
 
@@ -326,6 +342,12 @@ class EntTree(object):
         if self.mode == 'after':
             treedict = self.__afterpruning(x, y, self.treeDict)
             self.treeDict = treedict
+
+
+
+
+
+
 
 #区分训练集和测试集
 trainx = Xdata[[0,1,2,5,6,9,13,14,15,16],:]
@@ -353,13 +375,83 @@ treeDict = entropyTree.treeDict
 for i in range(7):
     print(entropyTree._EntTree__predictTree(testx[i], treeDict))
 
-    
+
+
+
+
+#######0407使用UCI数据集进行测试
+#1、iris
+from sklearn import preprocessing
+from sklearn import model_selection
+with open("UCI_data\\iris.data") as f:
+    iris_data = f.readlines()
+iris_data = [row.split(',') for row in iris_data][:-1]
+m, n = np.shape(iris_data)
+iris = np.zeros((m, n-1))
+irislabel = []
+for i in range(m):
+    iris[i,:] = iris_data[i][:-1]
+    irislabel.append(iris_data[i][-1])
+yencoder = preprocessing.LabelEncoder()
+irislabel = yencoder.fit_transform(irislabel)    
+trainx, testx, trainy, testy = model_selection.train_test_split(iris, irislabel, train_size=0.7, random_state=1234)
+labels = ['sepal_length', 'sepal_width', 'petal_length', 'petal_width']
+#不剪枝
+entropyTree = EntTree()
+entropyTree.train(trainx, trainy, labels, testx, testy)
+treeDict=entropyTree.treeDict  
+acc = 0
+for i in range(len(testy)):
+    preY = entropyTree._EntTree__predictTree(testx[i], treeDict)
+    if preY == testy[i]:
+        acc += 1
+print('对了%d个，acc='%acc,acc/len(testy))
+'''对了42个，acc= 0.9333333333333333'''
+#预剪枝
+entropyTree = EntTree()
+entropyTree.train(trainx, trainy, labels, testx, testy, mode='pre')
+treeDict1=entropyTree.treeDict
+acc = 0
+for i in range(len(testy)):
+    preY = entropyTree._EntTree__predictTree(testx[i], treeDict1)
+    if preY == testy[i]:
+        acc += 1
+print('对了%d个，acc='%acc,acc/len(testy))
+'''对了44个，acc= 0.9777777777777777'''
+#后剪枝
+entropyTree = EntTree()
+entropyTree.train(trainx, trainy, labels, testx, testy, mode='after')
+treeDict2 = entropyTree.treeDict
+acc = 0
+for i in range(len(testy)):
+    preY = entropyTree._EntTree__predictTree(testx[i], treeDict2)
+    if preY == testy[i]:
+        acc += 1
+print('对了%d个，acc='%acc,acc/len(testy))
+'''对了44个，acc= 0.9777777777777777'''
+
+#画树
 from sklearn import tree      
-clf = tree.DecisionTreeClassifier(criterion='entropy')      
-clf.fit(x,y)        
+clf = tree.DecisionTreeClassifier(criterion='gini',max_depth=3, min_samples_split=5, min_samples_leaf=5)      
+clf.fit(trainx, trainy)        
 clf.feature_importances_
-print(tree.export_graphviz(clf,feature_names=labels,class_names=['0','1']) )
-        
+import pydotplus
+from IPython.display import Image
+import sklearn.tree as tree
+dot_data = tree.export_graphviz(clf, 
+                                out_file=None, 
+                                feature_names=labels,  
+                                class_names=['1','2','3'],
+                                filled=True) 
+graph = pydotplus.graph_from_dot_data(dot_data)  
+Image(graph.create_png()) 
+acc = 0
+for i in range(len(testy)):
+    preY = clf.predict(testx[i].reshape(1,-1))
+    if preY == testy[i]:
+        acc += 1
+print('对了%d个，acc='%acc,acc/len(testy))
+'''对了43个，acc= 0.9555555555555556'''
 
         
         
