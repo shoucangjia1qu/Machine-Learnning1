@@ -126,7 +126,7 @@ for i in range(307):
 #label[np.nonzero(train[:,1]<10)[0]] = 0
 
 #2、梯度下降法和牛顿法解决逻辑斯蒂回归最大似然估计问题
-class logit(object):
+class logitall(object):
     #属性
     def __init__(self):
         self.w = 0
@@ -145,6 +145,7 @@ class logit(object):
             gra = np.sum(np.multiply(X,err) ,axis=0)
             w = w - r*gra/m
             errorList.append(err.sum())
+        self.gra = gra
         self.w = w
         self.preY = p
         self.trainSet = X
@@ -172,6 +173,161 @@ class logit(object):
         self.trainSet = X
         self.errorList = errorList
     
+    def calGra(self, X, Y, w):
+        wx = np.dot(X,w.T)
+        p = np.exp(wx)/(1+np.exp(wx))
+        err = p - Y.reshape(-1,1)
+        gra = np.sum(np.multiply(X,err) ,axis=0)
+        return gra.reshape(1,-1)
+    
+    #训练：拟牛顿法：DFP算法
+    def trainDFP(self, X, Y, r, steps=10, e=1.0e-4, N=10):
+        m, n = np.shape(X)
+        Dk0 = np.eye(n)             #初始的Dk0矩阵
+        w0 = np.ones((1,n))         #初始的权重矩阵
+        g0 = self.calGra(X,Y,w0)    #计算初始的梯度
+        if np.linalg.norm(g0)<e:
+            self.w = w0
+            return
+        for i in range(steps):
+            Pk = -np.dot(g0, Dk0)   #计算下降方向
+            minFx = np.inf
+            w1 = np.zeros((1,n))
+            bestr = 0
+            for n in range(N):      #一维搜素最优步长，并进行迭代
+                wi = w0 + (r**n)*Pk
+                Fx = sum(-np.multiply(Y.reshape(-1,1),np.dot(X,wi.T))+\
+                         np.log(1+np.exp(np.dot(X,wi.T))))      #求函数最小值
+                if Fx < minFx:
+                    minFx = Fx
+                    w1 = np.copy(wi)
+                    bestr = r**n
+            print('函数最小值:',minFx,'最好的步长：',bestr)
+            g1 = self.calGra(X,Y,w1) #计算迭代后的梯度
+            print('梯度：',np.linalg.norm(g1))
+            if np.linalg.norm(g1)<e:
+                self.w = w1
+                break
+            deltaW = w1 - w0
+            deltaG = g1 - g0
+            #计算新的Dk1矩阵
+            Dk1 = Dk0 + np.dot(deltaW.T, deltaW)/np.dot(deltaW, deltaG.T) - \
+            np.dot(np.dot(np.dot(Dk0, deltaG.T), deltaG), Dk0)/np.dot(np.dot(deltaG, Dk0), deltaG.T)
+            #赋予新的值
+            Dk0 = np.copy(Dk1)
+            w0 = np.copy(w1)
+            g0 = np.copy(g1)
+        if isinstance(self.w, int):
+            self.w = w1
+        wx = np.dot(X,self.w.T)
+        p = np.exp(wx)/(1+np.exp(wx))
+        self.iters = i
+        self.preY = p
+        self.trainSet = X
+        self.gra = g1 if g1 is not None else g0
+    
+    #训练：拟牛顿法：BFGS算法
+    def trainBFGS(self, X, Y, r, steps=5, e=1.0e-4, N=10):
+        m, n = np.shape(X)
+        Bk0 = np.eye(n)             #初始的Bk0矩阵
+        w0 = np.ones((1,n))         #初始的权重矩阵
+        g0 = self.calGra(X,Y,w0)    #计算初始的梯度
+        if np.linalg.norm(g0)<e:
+            self.w = w0
+            return
+        for i in range(steps):
+            Bk0ni = np.linalg.inv(Bk0)  #求Bk0的逆矩阵
+            Pk = -np.dot(g0, Bk0ni)   #计算下降方向
+            minFx = np.inf
+            w1 = np.zeros((1,n))
+            bestr = 0
+            for n in range(N):      #一维搜素最优步长，并进行迭代
+                wi = w0 + (r**n*Pk)
+                Fx = sum(-np.multiply(Y.reshape(-1,1),np.dot(X,wi.T))+\
+                         np.log(1+np.exp(np.dot(X,wi.T))))      #求函数最小值
+                if Fx < minFx:
+                    minFx = Fx
+                    w1 = np.copy(wi)
+                    bestr = r**n
+            print('函数最小值:',minFx,'最好的步长：',bestr,'最优次数：',n)
+            g1 = self.calGra(X,Y,w1) #计算迭代后的梯度
+            print('梯度的模：',np.linalg.norm(g1))
+            if np.linalg.norm(g1)<e:
+                self.w = w1
+                break
+            deltaW = w1 - w0
+            deltaG = g1 - g0
+            #计算新的Bk1矩阵
+            P = np.dot(deltaG.T, deltaG)/np.dot(deltaW, deltaG.T)
+            Q = np.dot(np.dot(np.dot(Bk0, deltaW.T), deltaW), Bk0)/np.dot(np.dot(deltaW, Bk0), deltaW.T)
+            Bk1 = Bk0 + P - Q
+            #赋予新的值
+            Bk0 = np.copy(Bk1)
+            w0 = np.copy(w1)
+            g0 = np.copy(g1)
+        if isinstance(self.w, int):
+            self.w = w1
+        wx = np.dot(X,self.w.T)
+        p = np.exp(wx)/(1+np.exp(wx))
+        self.iters = i
+        self.preY = p
+        self.trainSet = X
+        self.gra = g1 if g1 is not None else g0
+
+    #训练：拟牛顿法：LBFGS算法
+    def trainLBFGS(self, X, Y, r, steps=5, e=1.0e-4, N=10, alpha=0.5):
+        m, n = np.shape(X)
+        Gk0 = np.eye(n)             #初始的Gk0矩阵
+        w0 = np.ones((1,n))         #初始的权重矩阵
+        g0 = self.calGra(X,Y,w0)    #计算初始的梯度
+        if np.linalg.norm(g0)<e:
+            self.w = w0
+            return
+        for i in range(steps):
+            Pk = -np.dot(g0, Gk0)   #计算下降方向
+            minFx = np.inf
+            w1 = np.zeros((1,n))
+            bestr = 0
+            for n in range(N):      #一维搜素最优步长，并进行迭代
+                wi = w0 + (r**n*Pk)
+                Fx = sum(-np.multiply(Y.reshape(-1,1),np.dot(X,wi.T))+\
+                         np.log(1+np.exp(np.dot(X,wi.T))))      #求函数最小值
+                if Fx < minFx:
+                    minFx = Fx
+                    w1 = np.copy(wi)
+                    bestr = r**n
+            print('函数最小值:',minFx,'最好的步长：',bestr,'最优次数：',n)
+            g1 = self.calGra(X,Y,w1) #计算迭代后的梯度
+            print('梯度的模：',np.linalg.norm(g1))
+            if np.linalg.norm(g1)<e:
+                self.w = w1
+                break
+            deltaW = w1 - w0
+            deltaG = g1 - g0
+            G_DFP = Gk0 + np.dot(deltaW.T, deltaW)/np.dot(deltaW, deltaG.T) - \
+            np.dot(np.dot(np.dot(Gk0, deltaG.T), deltaG), Gk0)/np.dot(np.dot(deltaG, Gk0), deltaG.T)
+            G_BFGS =np.dot(np.dot((np.eye(n)-np.dot(deltaW.T,deltaG)/np.dot(deltaW,deltaG.T)), Gk0),\
+            np.eye(n)-np.dot(deltaG.T,deltaW)/np.dot(deltaW,deltaG.T)) + np.dot(deltaW.T,deltaW)/np.dot(deltaW,deltaG.T)
+            Gk1 = alpha*G_DFP + (1-alpha)*G_BFGS
+            #赋予新的值
+            Gk0 = np.copy(Gk1)
+            w0 = np.copy(w1)
+            g0 = np.copy(g1)
+        if isinstance(self.w, int):
+            self.w = w1
+        wx = np.dot(X,self.w.T)
+        p = np.exp(wx)/(1+np.exp(wx))
+        self.iters = i
+        self.preY = p
+        self.trainSet = X
+        self.gra = g1 if g1 is not None else g0
+
+
+
+
+
+
+
 
 X = np.hstack(( train, np.ones((train.shape[0],1)) ))
 #开始训练：梯度下降法
@@ -200,6 +356,12 @@ plt.show()
 #画图2（误差图）
 plt.plot(range(2000),error1)
 plt.show()
+
+
+
+
+
+
 
 ######西瓜书课后练习
 import numpy as np
@@ -230,7 +392,7 @@ dataSet = [
 #特征值列表
 labels = ['色泽', '根蒂', '敲击', '纹理', '脐部', '触感', '密度', '含糖率']
 #整理出数据集和标签
-X = np.array(dataSet)[:,6:8]
+X = np.array(dataSet)
 X=X.astype(float)
 Y = np.array(dataSet)[:,8]
 Y[Y=="好瓜"]=1
@@ -271,9 +433,11 @@ class logit(object):
         self.label = Y
         self.errorList = errorList
 
-#训练        
+
+
+#用牛顿法训练      
 lg = logit()
-lg.trainNw(X,Y,10)
+lg.trainNw(Xdata,Ylabel,10)
 error = lg.errorList
 w = lg.w
 #画图
@@ -284,6 +448,10 @@ plt.scatter(X[Y==0,0],X[Y==0,1],c='r',marker='d')
 plt.plot(np.linspace(0,0.8,10),a*np.linspace(0,0.8,10)+b)
 plt.show()
 
+m,n = np.shape(X[:,1].reshape(-1,1))
+X2 = np.hstack((X[:,1].reshape(-1,1),np.ones((m,1))))
+wx = np.dot(X2,w.T)
+P = lg.prelogit(wx)
 
 #换成梯度下降试试
 m,n = np.shape(X2)
@@ -304,4 +472,68 @@ preY[preY>=0.5]=1
 preY[preY<0.5]=0
 from sklearn import metrics
 print(metrics.classification_report(Y,preY))
+
+
+
+
+
+
+
+
+#############用全部的特征进行分类##############
+
+#用sklearn试试
+import sklearn.linear_model as linear_model
+logistic_model = linear_model.LogisticRegression()
+logistic_model.fit(Xdata, Ylabel)
+logistic_model.predict(Xdata)
+logistic_model.coef_
+
+#用statsmodels试试
+from scipy import stats
+import pandas as pd
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+X3 = np.hstack((Xdata,Ylabel.reshape(-1,1)))
+X3 = pd.DataFrame(X3, columns=['s1','s2','s3','s4','s5','s6','s7','s8','re'])
+lg = smf.glm('''re ~ s1+s2+s3+s4+s5+s6+s7+s8''', data=X3, 
+             family=sm.families.Binomial(sm.families.links.logit)).fit()
+lg.summary()
+
+#用拟牛顿法-DFP试试
+lg = logitall()
+lg.trainDFP(Xdata2, Ylabel, 0.6, steps=500)
+lg.w
+lg.iters
+
+#用拟牛顿法-BFGS试试
+lg = logitall()
+lg.trainBFGS(Xdata2, Ylabel, 0.6, steps=500)
+lg.w
+lg.iters
+
+#用拟牛顿法-LBFGS试试
+lg = logitall()
+lg.trainLBFGS(Xdata2, Ylabel, 0.6, steps=500)
+lg.w
+lg.iters
+
+
+
+################################
+# 用10折交叉验证和留一法进行验证 #
+################################
+import numpy as np
+import pandas as pd
+import os
+import matplotlib.pyplot as plt
+
+df = pd.read_csv('https://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data',header=None)
+Y = np.array(df.iloc[:,0])
+X = np.array(df.iloc[:,1:])
+Xscale = (X-np.mean(X,axis=0))/np.std(X,axis=0)
+
+lg = logit()
+lg.trainNw(Xscale,Y,10)
+
 
