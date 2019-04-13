@@ -105,7 +105,9 @@ b3 = LM.b
 preY3 = LM.preY
 loss3 = LM.sqrLoss
 
-#Logit回归
+
+
+###################Logit回归######################
 import numpy as np
 import pandas as pd
 import os
@@ -288,14 +290,14 @@ class logitall(object):
             minFx = np.inf
             w1 = np.zeros((1,n))
             bestr = 0
-            for n in range(N):      #一维搜素最优步长，并进行迭代
-                wi = w0 + (r**n*Pk)
+            for ni in range(N):      #一维搜素最优步长，并进行迭代
+                wi = w0 + (r**ni*Pk)
                 Fx = sum(-np.multiply(Y.reshape(-1,1),np.dot(X,wi.T))+\
                          np.log(1+np.exp(np.dot(X,wi.T))))      #求函数最小值
                 if Fx < minFx:
                     minFx = Fx
                     w1 = np.copy(wi)
-                    bestr = r**n
+                    bestr = r**ni
             print('函数最小值:',minFx,'最好的步长：',bestr,'最优次数：',n)
             g1 = self.calGra(X,Y,w1) #计算迭代后的梯度
             print('梯度的模：',np.linalg.norm(g1))
@@ -489,20 +491,20 @@ logistic_model.fit(Xdata, Ylabel)
 logistic_model.predict(Xdata)
 logistic_model.coef_
 
-#用statsmodels试试
+#用statsmodels试试(加上了C()，相当于将变量进行独热编码后进行训练)
 from scipy import stats
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 X3 = np.hstack((Xdata,Ylabel.reshape(-1,1)))
 X3 = pd.DataFrame(X3, columns=['s1','s2','s3','s4','s5','s6','s7','s8','re'])
-lg = smf.glm('''re ~ s1+s2+s3+s4+s5+s6+s7+s8''', data=X3, 
+lg = smf.glm('''re ~ C(s1)+s7+s8''', data=X3, 
              family=sm.families.Binomial(sm.families.links.logit)).fit()
 lg.summary()
 
 #用拟牛顿法-DFP试试
 lg = logitall()
-lg.trainDFP(Xdata2, Ylabel, 0.6, steps=500)
+lg.trainDFP(Xdata2[:,5:], Ylabel, 0.6, steps=500)
 lg.w
 lg.iters
 
@@ -512,9 +514,21 @@ lg.trainBFGS(Xdata2, Ylabel, 0.6, steps=500)
 lg.w
 lg.iters
 
+#多分类变量变成哑变量试试
+from sklearn.preprocessing import OneHotEncoder
+onehotencode = OneHotEncoder(categories='auto',handle_unknown='ignore')
+onehotencode.fit(Xdata2[:,0].reshape(-1,1))
+onehotdata=onehotencode.transform(Xdata2[:,0].reshape(-1,1)).toarray()    #得到独热编码的数据
+Xdata3 = np.hstack((onehotdata[:,1:],Xdata2[:,6:]))
+
+lg = logitall()
+lg.trainBFGS(Xdata3, Ylabel, 0.6, steps=500)
+lg.w
+lg.iters
+
 #用拟牛顿法-LBFGS试试
 lg = logitall()
-lg.trainLBFGS(Xdata2, Ylabel, 0.6, steps=500)
+lg.trainLBFGS(Xdata3, Ylabel, 0.6, steps=500)
 lg.w
 lg.iters
 
