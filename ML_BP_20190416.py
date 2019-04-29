@@ -167,9 +167,59 @@ plt.show()
 ##################测试结束######################
 
 
-##################西瓜3.0进行测试#######################
+##################拟合曲线#######################
+#准备数据集
+X = np.linspace(-0.5,0.5 , 200)[:, np.newaxis]
+noise = np.random.normal(0, 0.02, X.shape)
+Y = np.square(X) + noise
+#准备函数
+def logit(z):
+    return 1.0/(1+np.exp(-z))
 
+def logitD(Output):
+    return np.multiply(Output, (1-Output))
 
+def errorfunc(Y, Output):
+    return sum(0.5*np.power((Output-Y),2))
+
+#回归拟合曲线
+#数据标准化，很重要
+X = (X-X.mean(axis=0))/X.std(axis=0)
+errList = []
+m, n =np.shape(X)
+h = 20      #10个神经元，第一层隐含层
+v = 2*np.random.random((n+1, h))-1         #输入层权重(n+1,h)
+w = 2*np.random.random((h+1, 1))-1         #隐含层权重(h+1,1)
+r = 0.0005
+for i in range(3000):
+    ##正向计算输出值
+    
+    hi_input = np.hstack((X, np.ones(m).reshape(-1,1)))     #(m,n+1)
+    hi_dot = np.dot(hi_input, v)                            #(m,h)
+    hi_output = logit(hi_dot)                              #(m,h)  
+    
+    yi_input = np.hstack((hi_output, np.ones(m).reshape(-1,1)))     #(m,h+1)
+    yi_dot = np.dot(yi_input, w)                                    #(m,1)
+    yi_output = yi_dot
+    
+    ##计算输出结果
+    SSE = errorfunc(Y, yi_output)
+    errList.append(SSE[0])
+    if SSE<1.0e-4:
+        break
+    ##反向传播误差，计算隐含层和输入层梯度
+    Gra_hidden = (yi_output-Y)     #(m,1)
+    Gra_input = np.multiply(np.dot(Gra_hidden, w[:-1,:].T), logitD(hi_output))     #(m,h)
+    ##更新权重
+    w -= r*np.dot(yi_input.T, Gra_hidden)                      #(h+1,m)x(m,1)
+    v -= r*np.dot(hi_input.T, Gra_input)                     #(n+1,m)x(m,h)
+    if i%50 == 0:
+        
+        print(errList[-1])
+        #画图
+        plt.scatter(X,Y)
+        plt.plot(X,yi_output,c='r')
+        plt.show()
 
 
 
