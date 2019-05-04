@@ -105,7 +105,36 @@ b3 = LM.b
 preY3 = LM.preY
 loss3 = LM.sqrLoss
 
+###################加权线性回归######################
+X = np.linspace(-5,5 , 500)[:, np.newaxis]
+Y = np.multiply(1.1*(1-X+2*X**2),np.exp(-0.5*X**2))
+plt.scatter(X,Y)
+plt.show()
 
+def guass(alpha, X, Ci):
+    return np.exp(-np.linalg.norm((X-Ci))**2/(2*alpha**2))
+
+m, n = np.shape(X)
+preY = []
+k=0.005
+
+for i in range(m):
+    Xi = X[i]
+    w = np.eye(m)
+    for j in range(m):
+        w[j,j] = guass(k,Xi,X[j])
+    '''3-2找出斜率和截距X*A=Y'''
+    Ex = np.dot(X.T,np.dot(w,X))
+    '''3-3判断多项式是否为0'''
+    if np.linalg.det(Ex) != 0:
+        '''A = (Mx.T*Mx).I*Mx.T*Y'''
+        A = np.dot(np.dot(np.linalg.inv(Ex),X.T),np.dot(w,Y))
+        '''3-4预测Y'''
+        preY.append(np.dot(Xi,A))
+
+plt.scatter(X,Y)
+plt.plot(X,preY,c='r')
+plt.show()
 
 ###################Logit回归######################
 import numpy as np
