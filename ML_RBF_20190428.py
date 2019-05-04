@@ -52,10 +52,10 @@ def l2(X,C):
 
 #训练
 m, n = np.shape(X)
-r = 0.00015                          #学习率
+r = 0.000015                          #学习率
 errList = []
-alpha, C, w = init(X,10)            #初始化参数
-for i in range(2000):
+alpha, C, w = init(X,30)            #初始化参数
+for i in range(20000):
     ##正向传播
     hi_output = change(alpha,X,C)       #隐含层输出(m,h)，即通过径向基函数的转换
     yi_input = AddCol(hi_output)        #输出层输入(m,h+1)，因为是线性加权，故将偏置加入
@@ -73,13 +73,14 @@ for i in range(2000):
         deltaC2 += (Y-yi_output)[j]*np.dot(hi_output[j], X[j]-C)
     deltaC = np.dot(deltaC1,deltaC2)                #(h,1)x(1,n)
     C -= r*deltaC
-    if i%50 == 0:
+    if i%100 == 0:
+        print(errList[-1])
         #画图
         plt.scatter(X,Y)
         plt.plot(X,yi_output,c='r')
         plt.show()
 
-plt.plot(range(2000), errList)
+plt.plot(range(20000), errList)
 plt.show()
 
 
@@ -99,10 +100,61 @@ w = np.dot(np.linalg.inv(G), Y)
 
 plt.scatter(X,Y)
 plt.plot(X,np.dot(G,w),c='r')
-plt.scatter(Xi,Yi,c='y')
 plt.show()
 
 
-############完全内插法:解方程法求解RBF参数，固定alpha和中心点##############
+############选取几个中心点作为隐含层求解RBF参数##############
+X = np.linspace(-3,3 , 200)[:, np.newaxis]
+noise = np.random.normal(0, 0.02, X.shape)
+Y = np.square(X) + noise
+X = (X-X.mean(axis=0))/X.std(axis=0)
+
+m, n = np.shape(X)
+h = 20
+rand = np.random.randint(0,m,h)
+C = X[rand,:]
+Cdist = np.zeros((h,h))
+for  i in range(h):
+    for j in range(h):
+        if i != j:
+            Cdist[i,j] = np.linalg.norm(C[i]-C[j])
+alpha = Cdist.max()/(2*h)**0.5
+G = np.zeros((m,h))
+for i in range(h):
+    G[:,i] = np.exp(-np.linalg.norm((X-C[i]), axis=1)**2/(2*alpha**2))
+GGT = np.dot(G.T,G)
+GGT_inv = np.linalg.inv(GGT)
+w = np.dot(np.dot(GGT_inv, G.T), Y)
+
+plt.scatter(X,Y)
+plt.plot(X,np.dot(G,w),c='r')
+plt.show()
+
+Xi = np.array([15])
+Gi = np.exp(-np.linalg.norm((Xi-C), axis=1)**2/(2*alpha**2))
+Yi = np.dot(Gi,w.reshape(-1))
+
+plt.scatter(X,Y)
+plt.plot(X,np.dot(G,w),c='r')
+plt.scatter(Xi,Yi,c='g',linewidths=5)
+plt.show()
+
+
+###############测试,Hermit多项式###################
+X = np.linspace(-5,5 , 500)[:, np.newaxis]
+Y = np.multiply(1.1*(1-X+2*X**2),np.exp(-0.5*X**2))
+plt.scatter(X,Y)
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
 
 
