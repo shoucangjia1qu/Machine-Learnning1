@@ -93,7 +93,7 @@ class SMO(object):
                 besti2 = np.random.randint(0,self.m)
                 if besti2 != i1:
                     self.EiMark[besti2] = 1
-                    print('随机选取{}'.format(besti2))
+#                    print('随机选取{}'.format(besti2))
                     break
         else:
             for i in range(self.m):
@@ -104,7 +104,7 @@ class SMO(object):
                 if DeltaE > maxDeltaE:
                     maxDeltaE = DeltaE
                     besti2 = i
-        print('最大差法{}'.format(besti2))
+#        print('最大差法{}'.format(besti2))
         return besti2
         
     
@@ -461,10 +461,85 @@ svm.train()
 
 
 
-#
+#课后习题6.2
+dataSet = [
+        ['青绿', '蜷缩', '浊响', '清晰', '凹陷', '硬滑', 0.697, 0.460, '好瓜'],
+        ['乌黑', '蜷缩', '沉闷', '清晰', '凹陷', '硬滑', 0.774, 0.376, '好瓜'],
+        ['乌黑', '蜷缩', '浊响', '清晰', '凹陷', '硬滑', 0.634, 0.264, '好瓜'],
+        ['青绿', '蜷缩', '沉闷', '清晰', '凹陷', '硬滑', 0.608, 0.318, '好瓜'],
+        ['浅白', '蜷缩', '浊响', '清晰', '凹陷', '硬滑', 0.556, 0.215, '好瓜'],
+        ['青绿', '稍蜷', '浊响', '清晰', '稍凹', '软粘', 0.403, 0.237, '好瓜'],
+        ['乌黑', '稍蜷', '浊响', '稍糊', '稍凹', '软粘', 0.481, 0.149, '好瓜'],
+        ['乌黑', '稍蜷', '浊响', '清晰', '稍凹', '硬滑', 0.437, 0.211, '好瓜'],
+        ['乌黑', '稍蜷', '沉闷', '稍糊', '稍凹', '硬滑', 0.666, 0.091, '坏瓜'],
+        ['青绿', '硬挺', '清脆', '清晰', '平坦', '软粘', 0.243, 0.267, '坏瓜'],
+        ['浅白', '硬挺', '清脆', '模糊', '平坦', '硬滑', 0.245, 0.057, '坏瓜'],
+        ['浅白', '蜷缩', '浊响', '模糊', '平坦', '软粘', 0.343, 0.099, '坏瓜'],
+        ['青绿', '稍蜷', '浊响', '稍糊', '凹陷', '硬滑', 0.639, 0.161, '坏瓜'],
+        ['浅白', '稍蜷', '沉闷', '稍糊', '凹陷', '硬滑', 0.657, 0.198, '坏瓜'],
+        ['乌黑', '稍蜷', '浊响', '清晰', '稍凹', '软粘', 0.360, 0.370, '坏瓜'],
+        ['浅白', '蜷缩', '浊响', '模糊', '平坦', '硬滑', 0.593, 0.042, '坏瓜'],
+        ['青绿', '蜷缩', '沉闷', '稍糊', '稍凹', '硬滑', 0.719, 0.103, '坏瓜']
+    ]
+#特征值列表
+labels = ['色泽', '根蒂', '敲击', '纹理', '脐部', '触感', '密度', '含糖率']
+#整理出数据集和标签
+X = np.array(dataSet)[:,6:8]
+X=X.astype(float)
+Y = np.array(dataSet)[:,8]
+Y[Y=="好瓜"]=1
+Y[Y=="坏瓜"]=-1
+Y=Y.astype(float).reshape(-1,1)
+#训练
+smo = SMO()
+smo.train(X, Y, 100, 'Gaussian', 1.3, maxIters=20)
+SVMidx = smo.svindex        
+SVMvects = smo.SVMvects
+SVMlabels = smo.SVMlabels
+#预测
+testSet = X
+m, n = testSet.shape
+preLabels = np.zeros([m,1])
+for i in range(m):
+    sigmaK = smo.kernel(SVMvects,testSet[i,:])
+    preY = np.dot(np.multiply(smo.alpha[SVMidx],SVMlabels).T, sigmaK.reshape(-1,1)) + smo.b
+    preLabels[i,0] = np.sign(preY)
 
 
+#UCI数据集测试
+from sklearn import preprocessing
+from sklearn import model_selection
 
-
-
+with open("UCI_data\\iris.data") as f:
+    iris_data = f.readlines()
+iris_data = [row.split(',') for row in iris_data][:-1]
+m, n = np.shape(iris_data)
+iris = np.zeros((m, n-1))
+irislabel = []
+for i in range(m):
+    iris[i,:] = iris_data[i][:-1]
+    irislabel.append(iris_data[i][-1])
+yencoder = preprocessing.LabelEncoder()
+irislabel = yencoder.fit_transform(irislabel)    
+X = iris[:100]
+Y = irislabel[:100]
+Y[Y==0] = -1
+trainx, testx, trainy, testy = model_selection.train_test_split(X, Y, train_size=0.8, random_state=1234)
+trainy = trainy.reshape(-1,1)
+testy = testy.reshape(-1,1)
+Y = Y.reshape(-1,1)
+#训练
+smo = SMO()
+smo.train(trainx, trainy, 100, 'Gaussian', 3, maxIters=20)
+SVMidx = smo.svindex        
+SVMvects = smo.SVMvects
+SVMlabels = smo.SVMlabels
+#预测
+m, n = X.shape
+preLabels = np.zeros([m,1])
+for i in range(m):
+    sigmaK = smo.kernel(SVMvects,X[i,:])
+    preY = np.dot(np.multiply(smo.alpha[SVMidx],SVMlabels).T, sigmaK.reshape(-1,1)) + smo.b
+    preLabels[i,0] = np.sign(preY)
+sum(Y != preLabels)
 
