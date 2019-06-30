@@ -7,7 +7,7 @@ Created on Sun Jun 16 20:26:37 2019
 
 import os
 import numpy as np
-import pandas as np
+import pandas as pd
 
 os.chdir("D:\\mywork\\test")
 
@@ -105,10 +105,10 @@ class NBayes(object):
             for xIdx in range(n):
                 xi = testX[0,xIdx]
                 if len(set(self.X[:,xIdx])) <= 10:
-                    Ptest += self.PxyArr[yi][xIdx][xi]
+                    Ptest += np.log(self.PxyArr[yi][xIdx][xi])
                 else:
                     pxy = self.calContinous(xi, self.PxyArr[yi][xIdx]['miu'], self.PxyArr[yi][xIdx]['sigma'])
-                    Ptest += pxy
+                    Ptest += np.log(pxy)
                 print(yi,Ptest)
             preP[yi] = Py*Ptest
         return preP
@@ -155,6 +155,141 @@ Pdict = NB.predict(X[0,:].reshape(1,-1))
 logPdict = NB.predictlog(X[0,:].reshape(1,-1))
                 
             
+######二、半朴素贝叶斯分类器(Averaged One-Dependent Estimator)
+class HalfNBayes(object):
+    #设置属性
+    def __init__(self):
+        self.Y = 0          #训练集标签
+        self.X = 0          #训练集数据
+        self.PyArr = {}     #先验概率总容器
+        self.PxyArr = {}    #条件概率总容器
+        
+    #连续变量处理，返回均值和标准差
+    def Gaussian(self, xArr):
+        miu = np.mean(xArr)            #变量平均数
+        sigma = np.std(xArr)           #变量标准差
+        return miu, sigma
 
+    #离散变量直接计算概率
+    def classify(self, x, xArr, countSetX):
+        countX = len(xArr)              #计算变量X的数量
+        countXi = sum(xArr == x)   #计算变量X某个属性的数量
+        Pxy = (countXi+1)/(countX+countSetX)    #加入拉普拉斯修正的概率
+        return Pxy
+    
+    #计算P(xi,y)，加入了拉普拉斯修正
+    def calPy(self, X, Y):
+        m, n = np.shape(X)
+        Py = {}
+        countY = len(Y)
+        for i in set(Y.flatten()):
+            Py[i] = {}                          #第一层是标签Y的分类
+            for j in range(n):
+                setX = set(X[:,j])
+                countSetX = len(setX)
+                if countSetX <= 10:
+                    Py[i][j] = {}               #第二层是不同的变量X
+                    for xi in setX:
+                        countI = sum((Y[:,0] == i) & (X[:,j] == xi))
+                        Py[i][j][xi] = (countI + 1) / (countY + countSetX*len(set(Y.flatten())))       #第二层是分类变量xi的不同值
+        self.PyArr = Py
+        return
+    
+    #计算P(x|y,xi)，加入了拉普拉斯修正
+    def calPxy(self, X, Y):
+        m, n = np.shape(X)
+        Pxy = {}
+        for yi in set(Y.flatten()):
+            countYi = sum(Y[:,0] == yi)
+            Pxy[yi] = {}                        #第一层是标签Y的分类
+            for superX in range(n):
+                setSuperX = set(X[:,superX])
+                countSuperX = len(setSuperX)
+                if countSuperX <= 10:
+                    Pxy[yi][superX] = {}        #第二层是超父变量X，只有离散变量
+                    for superXi in setSuperX:
+                        Pxy[yi][superX][superXi] = {}               #第三层是超父变量的属性值superXi
+                        for xIdx in range(n):
+                            if xIdx == superX:
+                                continue
+                            Pxy[yi][superX][superXi][xIdx] = {}     #第四层是不同的变量X
+                            setX = set(X[:,xIdx])
+                            tempX = X[np.nonzero((Y[:,0] == yi)&(X[:,superX] == superXi))[0],xIdx]
+                            for xi in setX:
+                                countSetX = len(setX)
+                                if countSetX <= 10:
+                                    Pxy[yi][superX][superXi][xIdx][xi] = self.classify(xi, tempX, countSetX)     #第五层是变量Xi的分类概率，离散变量
+                                else:
+                                    Pxy[yi][superX][superXi][xIdx]['miu'], Pxy[yi][superX][superXi][xIdx]['sigma'] = self.Gaussian(tempX)
+        self.PxyArr = Pxy
+        return
+    
+    #训练
+    def train(self, X, Y):
+        self.calPy(X, Y)
+        print('P(y)训练完毕')
+        self.calPxy(X, Y)
+        print('P(x|y)训练完毕')
+        self.X = X
+        self.Y = Y
+        return
+    
+    #连续变量求概率密度
+    def calContinous(self, x, miu, sigma):
+        Pxy = np.exp(-(x-miu)**2/(2*sigma**2+1.0e-6))/(np.power(2*np.pi,0.5)*sigma+1.0e-6)   #计算概率密度
+        return Pxy
+    
+    #预测
+    def predict(self, testX):
+        preP = {}
+        m, n = testX.shape
+        for yi, Py in self.PyArr.items():
+            Ptest = Py
+            print(yi,Ptest)
+            for xIdx in range(n):
+                xi = testX[0,xIdx]
+                if len(set(self.X[:,xIdx])) <= 10:
+                    Ptest *= self.PxyArr[yi][xIdx][xi]
+                else:
+                    pxy = self.calContinous(xi, self.PxyArr[yi][xIdx]['miu'], self.PxyArr[yi][xIdx]['sigma'])
+                    Ptest *= pxy
+                print(yi,Ptest)
+            preP[yi] = Ptest
+        return preP
+    
+    #防止数值下溢，预测时用log
+    def predictlog(self, testX):
+        preP = {}
+        m, n = testX.shape
+        for yi, superXdict in self.PyArr.items():
+            print('yi是{}================'.format(yi))
+            Ptest = 0
+            for superX, superXidict in superXdict.items():
+                superXi = testX[0,superX]
+                Py = superXidict[superXi]
+                print('超父属性是{}，Py概率是{}'.format(superX, Py))
+                print('----------------')
+                Pxi = 0
+                for xIdx in range(n):
+                    if xIdx == superX:
+                        continue
+                    xi = testX[0,xIdx]
+                    print('第{}个变量，值是{}'.format(xIdx, xi))
+                    if len(set(self.X[:,xIdx])) <= 10:
+                        Pxi += np.log(self.PxyArr[yi][superX][superXi][xIdx][xi])
+                        print('概率是：',np.log(self.PxyArr[yi][superX][superXi][xIdx][xi]))
+                    else:
+                        pxy = self.calContinous(xi, self.PxyArr[yi][superX][superXi][xIdx]['miu'], self.PxyArr[yi][superX][superXi][xIdx]['sigma'])
+                        print('概率是：',pxy)
+                        Pxi += np.log(pxy)
+                Ptest += Py*Pxi
+            preP[yi] = Ptest
+        return preP
+                
+#训练
+HNB = HalfNBayes()
+HNB.train(X, Y)
+logPdict = HNB.predictlog(X[15,:].reshape(1,-1))
 
+                
 
