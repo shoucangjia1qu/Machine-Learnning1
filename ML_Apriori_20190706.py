@@ -123,6 +123,27 @@ class Apriori(object):
             self.ItemSupport[k].remove(i)
         return
     
+    #递归函数选择数组
+    def selectSet(self, n, X):
+        for xi in X:
+            conlist = []
+            X0 = X
+            n0 = n
+            X0.remove(xi)
+            n0 -= 1
+            if n > 0:
+                conlist.append(xi)
+                conlist1, jntlist = self.selectSet(n0, X0)
+                conlist.extend(conlist1)
+            else:
+                conlist.append(xi)
+                return conlist, X0
+            return conlist, jntlist
+    
+    #生成置信度数据
+    def calConfident(self):
+        
+    
     #循环遍历数据集
     def train(self, Xset, supthres):
         self.initSet(Xset, supthres)
@@ -131,6 +152,7 @@ class Apriori(object):
             self.add(k)                                         #生成新的数据集，支持度不符合的已经被剔除
             self.cut(k)                                         #对新的数据集进行剪切
             k += 1
+        self.calCondifent                                       #对数据生成置信度
         return
         
 
@@ -143,6 +165,41 @@ CutSet = ap.CutSet
 print(ItemSet, '\n')
 print(SupportSet, '\n') 
 print(CutSet)
+
+
+import copy
+
+saveDict = []
+def sel(n, dataSet, a=list()):
+    global saveDict
+    for i in dataSet:
+        n1 = copy.deepcopy(n)
+        x1 = copy.deepcopy(dataSet)
+        a.append(i)         #加入元素
+        n1 -= 1
+        x1.remove(i)
+        if n1 > 0:
+            sel(n1, x1, a)
+            a.remove(i)
+        else:
+            copya = copy.deepcopy(a)
+            copya.sort()
+            copyx1 = copy.deepcopy(x1)
+            copyx1.sort()
+            target = (copya,copyx1)
+            if target not in saveDict:
+                saveDict.append(target)
+            a.remove(i)
+    return
+
+n=4
+dataSet=list(range(5))
+sel(n, dataSet)
+saveDict
+
+
+
+
 
 
 
