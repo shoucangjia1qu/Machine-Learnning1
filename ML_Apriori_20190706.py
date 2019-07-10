@@ -9,8 +9,9 @@ import numpy as np
 import pandas as pd
 from collections import Iterable
 import os
+import copy
 
-os.chdir(r"D:mywork\test")
+os.chdir(r"D:\mywork\test")
 
 ###关联算法，Apriori算法
 data = [[1,2,5], [2,4], [2,3], [1,2,4], [1,3], [2,3], [1,3], [1,2,3,5], [1,2,3]]
@@ -124,25 +125,48 @@ class Apriori(object):
         return
     
     #递归函数选择数组
-    def selectSet(self, n, X):
-        for xi in X:
-            conlist = []
-            X0 = X
-            n0 = n
-            X0.remove(xi)
-            n0 -= 1
-            if n > 0:
-                conlist.append(xi)
-                conlist1, jntlist = self.selectSet(n0, X0)
-                conlist.extend(conlist1)
+    def selectSet(self, n, dataSet, a=list()):
+        for i in dataSet:
+            n1 = copy.deepcopy(n)
+            x1 = copy.deepcopy(dataSet)
+            a.append(i)         #加入元素
+            n1 -= 1
+            x1.remove(i)
+            if n1 > 0:
+                self.selectSet(n1, x1, a)
+                a.remove(i)
             else:
-                conlist.append(xi)
-                return conlist, X0
-            return conlist, jntlist
-    
+                copya = copy.deepcopy(a)
+                copya.sort()
+                copyx1 = copy.deepcopy(x1)
+                copyx1.sort()
+                target = (copya,copyx1)
+                if target not in self.saveDict:
+                    self.saveDict.append(target)
+                a.remove(i)
+        return
+
     #生成置信度数据
     def calConfident(self):
-        
+        for tier in self.ItemSupport:
+            if len(tier) == 0:
+                continue                #层数元素为空，跳出
+            pDict = {}
+            for sets, value in tier.items():
+                if len(sets) == 1:
+                    break               #当数据集中的元素个数仅为1时，结束循环
+                self.saveDict = []
+                setlist = list(sets)
+                for i in range(1, len(sets)):
+                    self.selectSet(i, setlist, [])      #排列组合选择元素
+                #加入概率函数
+                for A, B in self.saveDict:
+                    p = value/self.ItemSupport[len(A)-1][frozenset(A)]
+                    pDict['{}——>{}'.format(A, B)] = p
+                    print('{}——>{}'.format(A, B), p)
+            if len(pDict) != 0:
+                self.ItemConfident.append(pDict)
+        return
     
     #循环遍历数据集
     def train(self, Xset, supthres):
@@ -152,7 +176,7 @@ class Apriori(object):
             self.add(k)                                         #生成新的数据集，支持度不符合的已经被剔除
             self.cut(k)                                         #对新的数据集进行剪切
             k += 1
-        self.calCondifent                                       #对数据生成置信度
+        self.calConfident()                                     #对数据生成置信度
         return
         
 
@@ -161,44 +185,12 @@ ap = Apriori()
 ap.train(data, 0.2)        
 ItemSet = ap.ItemSet
 SupportSet = ap.ItemSupport
+ConfidentSet = ap.ItemConfident
 CutSet = ap.CutSet
 print(ItemSet, '\n')
 print(SupportSet, '\n') 
+print(ConfidentSet, '\n')
 print(CutSet)
-
-
-import copy
-
-saveDict = []
-def sel(n, dataSet, a=list()):
-    global saveDict
-    for i in dataSet:
-        n1 = copy.deepcopy(n)
-        x1 = copy.deepcopy(dataSet)
-        a.append(i)         #加入元素
-        n1 -= 1
-        x1.remove(i)
-        if n1 > 0:
-            sel(n1, x1, a)
-            a.remove(i)
-        else:
-            copya = copy.deepcopy(a)
-            copya.sort()
-            copyx1 = copy.deepcopy(x1)
-            copyx1.sort()
-            target = (copya,copyx1)
-            if target not in saveDict:
-                saveDict.append(target)
-            a.remove(i)
-    return
-
-n=4
-dataSet=list(range(5))
-sel(n, dataSet)
-saveDict
-
-
-
 
 
 
