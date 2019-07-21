@@ -27,7 +27,7 @@ from scipy.stats import chi2, f
 
 class preprocessing(object):
     """
-    包含卡方检验、方差分析、卡方分箱、WOE编码和IV值等功能
+    包含卡方检验、方差分析、卡方分箱、WOE编码和IV值、分箱后的替换方法。
     
     """
 
@@ -169,26 +169,89 @@ class preprocessing(object):
         return Xcates, boxcount, Tchi2, TpValue
     
     #WOE编码和IV值
+    def WOEandIV(self, x, y):
+        """
+        适用于二分类
+        Input
+        x:变量[1D]array
+        y:实际标签[1D]array，适用于二分类[0,1]
+        return
+        IV:总体IV值
+        WOE:各类别的WOE值
+        """
+        xValues = np.sort(np.unique(x))
+        yt1 = sum(y==1)                 #总体样本的正值合计
+        yt0 = sum(y==0)                 #总体样本的负值合计
+        WOElist = []
+        IVlist = []
+        for value in xValues:
+            yi1 = sum((x==value)&(y==1))
+            yi0 = sum((x==value)&(y==0))
+            if yi1==0 or yi0==0:
+                py1 = (yi1+1)/(yt1+1)       #拉普拉斯修正
+                py0 = (yi0+1)/(yt0+1)
+            else:
+                py1 = yi1/yt1
+                py0 = yi0/yt0
+            woe = np.log(py1/py0)
+            iv = (py1 - py0)*woe
+            WOElist.append(woe)
+            IVlist.append(iv)
+            print(py1, py0)
+        return sum(IVlist), WOElist
     
+    #替换分箱值
+    def replacebox(self, x, splitList, woeValue=None, method='mean'):
+        """
+        将原来的数组替换成分箱后的数组
+        Input
+        x:变量[1D]array
+        method:替换方法，默认mean，可选median, woe, upedge, downedge等替换方法
+        splitList:分割点列表
+        woeValue:选择woe，需要输入woeValue
+        return
+        array:替换好后的数组
+        """
+        newx = np.copy(x)
+        if method == 'mean':
+            for idx, value in enumerate(splitList[:-1]):
+                if idx == len(splitList)-2:
+                    xi = x[(x>=value)&(x<=splitList[idx+1])]
+                    newx[(x>=value)&(x<=splitList[idx+1])] = xi.mean()
+                else:
+                    xi = x[(x>=value)&(x<splitList[idx+1])]
+                    newx[(x>=value)&(x<splitList[idx+1])] = xi.mean()
+        elif method == 'median':
+            for idx, value in enumerate(splitList[:-1]):
+                if idx == len(splitList)-2:
+                    xi = x[(x>=value)&(x<=splitList[idx+1])]
+                    newx[(x>=value)&(x<=splitList[idx+1])] = np.median(xi)
+                else:
+                    xi = x[(x>=value)&(x<splitList[idx+1])]
+                    newx[(x>=value)&(x<splitList[idx+1])] = np.median(xi)
+        elif method == 'upedge':
+            for idx, value in enumerate(splitList[:-1]):
+                if idx == len(splitList)-2:
+                    newx[(x>=value)&(x<=splitList[idx+1])] = splitList[idx]
+                else:
+                    newx[(x>=value)&(x<splitList[idx+1])] = splitList[idx]
+        elif method == 'downedge':
+            for idx, value in enumerate(splitList[:-1]):
+                if idx == len(splitList)-2:
+                    newx[(x>=value)&(x<=splitList[idx+1])] = splitList[idx+1]
+                else:
+                    newx[(x>=value)&(x<splitList[idx+1])] = splitList[idx+1]
+        elif method == 'woe':
+            for idx, value in enumerate(splitList[:-1]):
+                if idx == len(splitList)-2:
+                    newx[(x>=value)&(x<=splitList[idx+1])] = woeValue[idx]
+                else:
+                    newx[(x>=value)&(x<splitList[idx+1])] = woeValue[idx]
+        else:
+            ValueError('no method {}'.format(method))
+        return newx
         
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-
 
 
 
