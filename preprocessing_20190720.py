@@ -146,18 +146,28 @@ class preprocessing(object):
                 cutPoint2 = Xcates[cutIdx0+2]
                 xi = x[(x>=cutPoint0)&(x<cutPoint2)]
                 yi = y[(x>=cutPoint0)&(x<cutPoint2)]
+                if len(xi[(xi>=cutPoint0)&(xi<cutPoint1)]) == 0:
+                    Xcates = np.delete(Xcates, cutIdx0+1)
+#                    print(1,Xcates, cutIdx0+1)
+                    break
                 xi[(xi>=cutPoint0)&(xi<cutPoint1)] = cutPoint0
+                if len(xi[(xi>=cutPoint1)&(xi<cutPoint2)]) == 0:
+                    Xcates = np.delete(Xcates, cutIdx0+2)
+#                    print(2,Xcates, cutIdx0+2)
+                    break
                 xi[(xi>=cutPoint1)&(xi<cutPoint2)] = cutPoint1
-                chi2, pValue, df, eptFre = self.calChi2(xi, yi)         #只有一类时，卡方值为0， 
+                chi2, pValue, df, eptFre = self.calChi2(xi, yi)         #只有一类时，卡方值为0，
+#                print(chi2,pValue)
                 if chi2 < minChi2:
                     minChi2 = chi2
                     minpValue = pValue
                     cutIdx = cutIdx0 + 1
             #合并最小的卡方值的相邻分类，将需要合并的数值在Xcates中删除
-            print(Xcates)
-            print(cutIdx)
-            Xcates = np.delete(Xcates, cutIdx)
-            boxcount = len(Xcates)-1
+#            print(Xcates)
+#            print(cutIdx)
+            if cutIdx != 0:
+                Xcates = np.delete(Xcates, cutIdx)
+                boxcount = len(Xcates)-1
         #计算分箱后的总体卡方值
         TXi = np.copy(x)
         for idx, value in enumerate(Xcates):
@@ -197,7 +207,7 @@ class preprocessing(object):
             iv = (py1 - py0)*woe
             WOElist.append(woe)
             IVlist.append(iv)
-            print(py1, py0)
+#            print(py1, py0)
         return sum(IVlist), WOElist
     
     #替换分箱值
@@ -248,7 +258,7 @@ class preprocessing(object):
                 else:
                     newx[(x>=value)&(x<splitList[idx+1])] = woeValue[idx]
         else:
-            ValueError('no method {}'.format(method))
+            ValueError('no method named {}'.format(method))
         return newx
         
         
