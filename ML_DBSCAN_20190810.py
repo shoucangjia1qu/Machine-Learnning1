@@ -138,6 +138,7 @@ class DBSCAN(object):
             centerPoints = copy.deepcopy(newCenterPoints)
             self.ClusterDict[centerIdx] = ClusterList               #簇的字典{中心点：簇中其他点}
             labels[ClusterList] = k                                 #标签
+            k += 1
         ##3、得到最终的聚类结果
         self.Unvisits = UnvisitIdx
         self.n_clusters = k
@@ -158,7 +159,9 @@ if __name__ == "__main__":
     Unvisit = db.Unvisits
     for centerIdx, nebIdx in ClusterDict.items():
         plt.scatter(data[nebIdx,0], data[nebIdx,1])
+        #核心点
         plt.scatter(data[centerIdx,0], data[centerIdx,1], c='r', marker='s',linewidths=5)
+    #噪音点
     plt.scatter(data[Unvisit,0], data[Unvisit,1], c='r', marker='*',linewidths=5)
     plt.show()
         
