@@ -223,17 +223,134 @@ if __name__ == "__main__":
     k = 3
     GMM.train(data, k, 50)
     Clusters = GMM.ClusterLabel
-    
+    labels = GMM.ClusterLabel
 
+#评价指标        
+##轮廓系数
+def LK(train,Labels):
+    LK = []
+    m = 0
+    for data in train:
+        n=0
+        a = 0
+        b = dict()
+        avalue = 0
+        bvalue = 0
+        for subdata in train: 
+            if m==n:
+                n += 1
+                continue
+            if Labels[m] == Labels[n]:
+                a += db.calDist(data,subdata)
+            else:
+                if Labels[n] not in b.keys():
+                    b[Labels[n]] = 0
+                b[Labels[n]] += db.calDist(data,subdata)
+            n += 1
+        '''a是点到本簇中其他点的平均距离'''
+        avalue = (a/(len(np.nonzero(Labels==Labels[m])[0])-1))
+        '''b是点到其他簇中其他点的平均距离的最小值'''
+        bvalue = np.min([value/len(np.nonzero(Labels==la)[0]) for la,value in b.items()])
+        LK.append((bvalue-avalue)/max(bvalue,avalue))
+        m += 1
+    LKratio = np.mean(LK)
+    return(LKratio)
+print(LK(data,labels))
 
+##DB指数
+###1、欧式距离
+def calEdist(v1, v2):
+    return np.linalg.norm((v1-v2))
 
+###2、簇内平均距离
+def avgCluster(x):
+    dist = 0
+    m, d = np.shape(x)
+    for i in range(m):
+        for j in range(m):
+            if j > i:
+                dist += calEdist(x[i], x[j])
+    return dist/(m*(m-1))
 
+###3、簇内最大距离
+def maxCluster(x):
+    maxdist = 0
+    m, d = np.shape(x)
+    for i in range(m):
+        for j in range(m):
+            if j > i:
+                dist = calEdist(x[i], x[j])
+            else:
+                continue
+            if dist > maxdist:
+                maxdist = copy.deepcopy(dist)
+    return maxdist
 
+###4、两簇间中心点距离
+def centerClusters(x1, x2):
+    m1, d1 = np.shape(x1)
+    m2, d2 = np.shape(x2)
+    miu1 = np.sum(x1, axis=0)/m1
+    miu2 = np.sum(x2, axis=0)/m2
+    return calEdist(miu1, miu2)
 
+###5、两簇间最近样本距离
+def minClusters(x1, x2):
+    mindist = np.inf
+    m1, d1 = np.shape(x1)
+    m2, d2 = np.shape(x2)
+    for i in range(m1):
+        for j in range(m2):
+            dist = calEdist(x1[i], x2[j])
+            if dist < mindist:
+                mindist = copy.deepcopy(dist)
+    return mindist
 
+###6、DB指数
+def calDBI(train, label):
+    labelSet = np.unique(label)
+    k = len(labelSet)
+    DBIList = []
+    for i in labelSet:
+        maxDBI = 0
+        for j in labelSet:
+            if i==j:
+                continue
+            xi = train[label==i]
+            xj = train[label==j]
+            DBI = (avgCluster(xi) + avgCluster(xj))/centerClusters(xi, xj)
+            if DBI > maxDBI:
+                maxDBI = copy.deepcopy(DBI)
+        DBIList.append(maxDBI)
+    return sum(DBIList)/k, DBIList
 
+print(calDBI(data, labels))
 
-
+##Dunn指数
+def calDI(train, label):
+    labelSet = np.unique(label)
+    k = len(labelSet)
+    clusterMax = 0              #计算簇内样本间最大距离
+    for i in labelSet:
+        xl = train[label==i]
+        clusterDist = maxCluster(xl)
+        if clusterDist > clusterMax:
+            clusterMax = copy.deepcopy(clusterDist)
+    minOutCluster = []
+    for i in labelSet:
+        minInCluster = np.inf
+        for j in labelSet:
+            if i==j:
+                continue
+            xi = train[label==i]
+            xj = train[label==j] 
+            Incluster = minClusters(xi, xj)/clusterMax
+            if Incluster < minInCluster:
+                minInCluster = copy.deepcopy(Incluster)
+        minOutCluster.append(minInCluster)
+    return min(minOutCluster), minOutCluster
+            
+print(calDI(data, labels))
 
 
 
