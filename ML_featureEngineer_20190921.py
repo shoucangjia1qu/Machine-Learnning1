@@ -229,9 +229,67 @@ relief.train(X, Y)
 W = relief.W                        #各属性的统计量
 
 
+###另编一个，按照顺序来的
+#1、求K近邻函数
+def K_near(xi, Xset, K=1, selfIdx=None):
+    distList = np.linalg.norm((xi-Xset), axis=1)
+    if selfIdx is not None:
+        distList[selfIdx] = np.inf
+    idx_sort = np.argsort(distList)
+    return idx_sort[:K]
 
-
-
+#2、正式求统计量
+def cal_rf(X, Y, column, K=1, col_type="continuous"):
+    m, d = np.shape(X)
+    Yset = list(np.unique(Y))               #分类标签的集合
+    W = 0                                   #初始化统计量
+    normX = X[:,column]                     #将属性值进行规范化，离散变量不需要，连续变量需要
+    if col_type=="continuous":
+        normX = (normX-normX.min())/(normX.max()-normX.min())
+    for i in range(m):
+        xi = X[i]                           #样本
+        yi = Y[i]                           #样本的标签
+        xy_value = normX[i]                 #样本对应的变量值
+        for label_idx, label in enumerate(Yset):
+            Xset_idx = np.nonzero(Y==label)[0]
+            Xset_idx_list = list(np.nonzero(Y==label)[0])
+            Xset = X[Xset_idx,:]
+            if label==yi:
+                self_idx = Xset_idx_list.index(i)
+                nhit_idx = K_near(xi, Xset, K, self_idx)
+                nhit_set = normX[Xset_idx[nhit_idx]]      #同样本类型的变量值
+                if col_type=="continuous":
+                    if K>1:
+                        W = W - sum(np.power((xy_value-nhit_set),2))
+                    else:
+                        W = W - np.power((xy_value-nhit_set),2)
+                else:
+                    for nhit_i in nhit_set:
+                        if nhit_i != xy_value:
+                            W -= 1
+                        else:
+                            pass
+            else:
+                pi = sum(Y==label)/(len(Y)-sum(Y==yi))
+                nmiss_idx = K_near(xi, Xset, K)
+                mhit_set = normX[Xset_idx[nmiss_idx]]
+                if col_type=="continuous":
+                    if K>1:
+                        W += pi*sum(np.power((xy_value-mhit_set),2))
+                    else:
+                        W += pi*np.power((xy_value-mhit_set),2)
+                else:
+                    for mhit_i in mhit_set:
+                        if mhit_i != xy_value:
+                            W += pi*1
+                        else:
+                            pass
+    W = W/(m*K)
+    return W
+    
+for i in range(4):
+    rf = cal_rf(X, Y, i)
+    print(rf)
 
 
 
