@@ -6,6 +6,8 @@ Created on Fri Aug  2 21:43:43 2019
 """
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+os.chdir(r"D:\mywork\test")
 
 #高斯混合聚类模型类
 class GaussianMix(object):
@@ -36,7 +38,7 @@ class GaussianMix(object):
         AlphaArr0 = np.ones((1,k))/k
         MiuArr0 = x[np.random.randint(0, self.m, k)]
         #在这里固定好了
-        MiuArr0 = x[[5,21,26]]
+        #MiuArr0 = x[[5,6,12]]
         SigmaArr0 = np.array([(np.eye(self.d)*0.1).tolist()]*k)
         return AlphaArr0, MiuArr0, SigmaArr0
 
@@ -129,10 +131,11 @@ class GaussianMix(object):
             GamaProbArr, GaussProbArr = self.Gama_Prob(x, AlphaArr0, MiuArr0, SigmaArr0)
             #计算聚类结果
             ClusterLabel = np.argmax(GamaProbArr, axis=1)
-            #画分布图
-            self.drawPics(x, MiuArr0, SigmaArr0, ClusterLabel)
+            #画分布图(适用于二维)
+            #self.drawPics(x, MiuArr0, SigmaArr0, ClusterLabel)
             #计算似然函数，并判断是否继续更新
-            LLvalue1 = self.calLLvalue(GamaProbArr, GaussProbArr)
+            #LLvalue1 = self.calLLvalue(GamaProbArr, GaussProbArr)
+            LLvalue1 = GaussProbArr.sum()
             print('似然值：',LLvalue1)
             if len(LLvalueList) == 0:
                 LLvalue0 = LLvalue1
@@ -224,6 +227,20 @@ if __name__ == "__main__":
     GMM.train(data, k, 50)
     Clusters = GMM.ClusterLabel
     labels = GMM.ClusterLabel
+    ##############鸢尾花数据，利用聚类结果和实际标签进行比较
+    with open(r"D:\mywork\test\UCI_data\iris.data") as f:
+        data = f.readlines()
+    trainSet = np.array([row.split(',') for row in data[:-1]])
+    trainSet = trainSet[:,:-1].astype('float')
+    trainSet = (trainSet - trainSet.mean(axis=0))/trainSet.std(axis=0)
+    k = 3
+    GMM = GaussianMix()
+    GMM.train(trainSet, k, 50)
+    Clusters = GMM.ClusterLabel
+    labels = GMM.ClusterLabel
+
+
+
 
 #评价指标        
 ##轮廓系数
@@ -357,8 +374,239 @@ print(calDI(data, labels))
 
 
 
+###GMM半监督学习——生成式方法
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+os.chdir(r"D:\mywork\test")
+
+class GaussianMix(object):
+    #1、类的属性
+    def __init__(self):
+        self.trainSet = 0               #数据集
+        self.ClusterLabel = 0           #聚类标签
+        self.k = 0                      #聚类个数
+        self.LL_ValueList = []          #最大似然函数的值列表
+        self.AlphaArr = 0               #高斯混合模型混合系数
+        self.MiuArr = 0                 #高斯分布函数的均值参数
+        self.SigmaArr = 0               #高斯分布函数的协方差参数
+        self.m = 0                      #样本数
+        self.d = 0                      #样本维度
+        
+    #2、初始化函数参数
+    def initParas(self, x, k):
+        """
+        input:
+            x:样本集,m*d,其中m为样本数,d为样本维度数
+            k:需要聚类的个数
+        return:
+            初始化AlphaArr, MiuArr, SigmaArr
+        """
+        self.trainSet = x
+        self.k = k
+        self.m, self.d = np.shape(x)
+        AlphaArr0 = np.ones((1,k))/k
+        MiuArr0 = x[np.random.randint(0, self.m, k)]
+        #在这里固定好了
+        #MiuArr0 = x[[5,21,26]]
+        SigmaArr0 = np.array([(np.eye(self.d)*0.1).tolist()]*k)
+        return AlphaArr0, MiuArr0, SigmaArr0
+
+    
+    #3、计算高斯分布函数
+    def Gaussian_multi(self, x, miu, sigma):
+        """
+        多元高斯分布的密度函数
+        input:
+            x:样本集,m*d,其中m为样本数,d为样本维度数
+            miu:该高斯分布的均值,1*d维
+            sigma:该高斯分布的标准差,在此为d*d的协方差矩阵
+        return:
+            distributionArr:返回样本的概率分布1D数组
+        """
+        distributionArr = np.exp(-0.5*np.sum(np.multiply(np.dot(x-miu, np.linalg.pinv(sigma)), x-miu), axis=1))/\
+        (np.power(2*np.pi, 0.5*self.d)*np.linalg.det(sigma)**0.5)
+        return distributionArr
+
+    #4、计算观测值y，高斯分布函数参数条件下，观测来自于第k个高斯分布的概率
+    def Gama_Prob(self, x, AlphaArr, MiuArr, SigmaArr):
+        """
+        计算当观测值已知，是哪个高斯模型产品该观测值的概率
+        input:
+            x:样本集,m*d,其中m为样本数,d为样本维度数
+            AlphaArr:每个高斯模型出现的先验概率,1*k维,k为聚类个数
+            MiuArr:每个高斯模型的均值参数,k*d维
+            SigmaArr:每个高斯模型的协方差矩阵参数,k*d*d维
+        return:
+            GamaProbArr:每个样本出现对应每个高斯模型分布概率的矩阵,m*k维
+        """
+        GaussProbArr = np.zeros((self.m, self.k))
+        for i in range(self.k):
+            miu = MiuArr[i]
+            sigma = SigmaArr[i]
+            GaussProbArr[:,i] = self.Gaussian_multi(x, miu, sigma)
+        GamaProbArr = np.copy(np.multiply(GaussProbArr, AlphaArr))
+        SumGamaProb = np.sum(GamaProbArr, axis=1).reshape(-1,1)
+        return (GamaProbArr/SumGamaProb).round(4), GamaProbArr.round(4)
+    
+    #5、更新高斯分布函数参数
+    def updateParas(self, x, GamaProbArr):
+        """
+        更新高斯分布函数的参数，包括均值和协方差矩阵
+        input:
+            x:样本集,m*d,其中m为样本数,d为样本维度数
+            GamaProbArr:高斯分布函数的后验概率,m*k维
+        return:
+            newMiuArr:更新后的高斯分布函数的均值,k*d维
+            newSigmaArr:更新后的高斯分布的协方差矩阵,k*d*d维
+            newAlphaArr:更新后的高斯模型的混合系数,1*k维
+        """
+        SumGamaProb = np.sum(GamaProbArr, axis=0)
+        newMiuArr = np.zeros((self.k,self.d))
+        newSigmaArr = np.zeros((self.k,self.d,self.d))
+        for i in range(self.k):
+            Gama = GamaProbArr[:,i].reshape(-1,1)
+            #更新均值
+            newMiu = np.sum(np.multiply(Gama, x), axis=0)/SumGamaProb[i]
+            newMiuArr[i] = newMiu
+            #更新协方差矩阵
+            newSigma = np.dot(np.multiply(x-newMiu, Gama).T, x-newMiu)/SumGamaProb[i]
+            newSigmaArr[i] = newSigma
+        newAlphaArr = SumGamaProb.reshape(1,-1)/self.m
+        return newMiuArr, newSigmaArr, newAlphaArr
+
+    #6、求似然函数值
+    def calLLvalue(self, GamaProbArr, GaussProbArr):
+        lnGaussProbArr = np.log(GaussProbArr+1.0e-6)
+        LLvalue = np.sum(np.multiply(GamaProbArr, lnGaussProbArr))
+        return LLvalue
+    
+    #7、训练：判断是否符合停止条件
+    def train(self, x, k, iters):
+        """
+        循环迭代
+        input:
+            x:样本集,m*d,其中m为样本数,d为样本维度数
+            k:聚类个数
+            iters:迭代次数
+        return:
+            ClusterLabel:最终的聚类结果
+        """
+        #初始化参数
+        AlphaArr0, MiuArr0, SigmaArr0 = self.initParas(x, k)
+        LLvalue0 = 0                #初始似然函数值
+        LLvalueList = []            #最大似然值列表
+        for i in range(iters):
+            #计算高斯分布模型的后验概率，也就是已知观测下来自于第k个高斯分布函数的概率
+            GamaProbArr, GaussProbArr = self.Gama_Prob(x, AlphaArr0, MiuArr0, SigmaArr0)
+            #计算聚类结果
+            ClusterLabel = np.argmax(GamaProbArr, axis=1)
+            #画分布图
+            self.drawPics(x, MiuArr0, SigmaArr0, ClusterLabel)
+            #计算似然函数，并判断是否继续更新
+            #LLvalue1 = self.calLLvalue(GamaProbArr, GaussProbArr)
+            LLvalue1 = sum(GaussProbArr)
+            print('似然值：',LLvalue1)
+            if len(LLvalueList) == 0:
+                LLvalue0 = LLvalue1
+            else:
+                LLdelta = LLvalue1 - LLvalue0
+                print('似然值提升：',LLdelta)
+                if abs(LLdelta)<1.0e-6:
+                    break
+                else:
+                    LLvalue0 = LLvalue1
+            LLvalueList.append(LLvalue1)
+            #继续迭代，更新函数参数
+            MiuArr1, SigmaArr1, AlphaArr1 = self.updateParas(x, GamaProbArr)
+            MiuArr0 = np.copy(MiuArr1)
+            SigmaArr0 = np.copy(SigmaArr1)
+            AlphaArr0 = np.copy(AlphaArr1)
+        self.ClusterLabel = ClusterLabel
+        self.LL_ValueList = LLvalueList
+        plt.plot(range(len(LLvalueList)), LLvalueList)
+        plt.show()
+        return
+
+    #8-1、画图
+    def drawPics(self, x, MiuArr, SigmaArr, Clusters):
+        """
+        画图，不同聚类类别的点分布，等高图
+        input:
+            x:样本集,m*d,其中m为样本数,d为样本维度数
+            MiuArr, SigmaArr:高斯分布函数的参数
+            Clusters:聚类结果
+        out:
+            散点图+等高分布图
+        """
+        plt.figure(figsize=(10,6))
+        xgrid, ygrid, zgrid = self.calXYZ(x, MiuArr, SigmaArr)
+        #c=plt.contour(xgrid,ygrid,zgrid,6,colors='black')
+        plt.contour(xgrid,ygrid,zgrid,6,colors='black')
+        plt.contourf(xgrid,ygrid,zgrid,6,cmap=plt.cm.Blues,alpha=0.5)
+        #plt.clabel(c,inline=True,fontsize=10)
+        for i in range(self.k):
+            xi = x[Clusters==i,0]
+            yi = x[Clusters==i,1]
+            plt.scatter(xi, yi)
+            plt.scatter(MiuArr[i,0], MiuArr[i,1], c='r', linewidths=5, marker='D')
+        plt.show()
+        return
+
+    #8-2、计算网格状的高斯分布，用于画等高线
+    def calXYZ(self, x, MiuArr, SigmaArr):
+        """
+        画等高图需要计算X,Y,Z
+        input:
+            x:样本集,m*d,其中m为样本数,d为样本维度数
+            MiuArr, SigmaArr:高斯分布函数的参数
+        return:
+            xgrid:x的网格坐标
+            ygrid:y的网格坐标
+            zgrid:(x,y)网格坐标上高斯分布函数的概率
+        """
+        x1 = np.copy(x[:,0])
+        x1.sort()
+        y1 = np.copy(x[:,1])
+        y1.sort()
+        x2,y2 = np.meshgrid(x1,y1)  # 获得网格坐标矩阵
+        Gp = np.zeros((self.m,self.m))
+        for i in range(self.m):
+            for j in range(self.m):
+                xi = x2[i,j]
+                yi = y2[i,j]
+                data = np.array([xi,yi])
+                miuList=[]
+                for miu, sigma in zip(MiuArr, SigmaArr):   
+                    p = np.exp(-0.5*np.dot(np.dot((data-miu).reshape(1,-1), np.linalg.inv(sigma)), (data-miu).reshape(-1,1)))/\
+                    np.power(2*np.pi, 0.5*self.d)*np.linalg.det(sigma)**0.5
+                    miuList.append(p)
+                Gp[i,j] = max(miuList)
+        return x2, y2, Gp
 
 
+##############鸢尾花数据，每类随机取10个样本为已知标记的样本，剩下的为未知标记样本
+with open(r"D:\mywork\test\UCI_data\iris.data") as f:
+    data = f.readlines()
+trainSet = np.array([row.split(',') for row in data[:-1]])
+trainSet = trainSet[:,:-1].astype('float')
+trainSet = (trainSet - trainSet.mean(axis=0))/trainSet.std(axis=0)
+labelSet = np.zeros(trainSet.shape[0])
+labelSet[50:100] = 1; labelSet[100:] = 2                            #分段设置标签，0~50，50~100，100~150
+Dl_index = np.random.randint(0, trainSet.shape[0], 30)              #随机选取的数据下标,有可能会重复
+Dl_index = np.unique(Dl_index)                                      #对下标去重
+DlSet = trainSet[Dl_index]                                          #已知标记的数据集Dl
+DlLabel = labelSet[Dl_index]                                        #已知标记的数据标签Y
+DuSet = np.delete(trainSet, Dl_index, axis=0)                       #作为未知标记的数据集Du
+DuLabel = np.delete(labelSet, Dl_index, axis=0)                     #作为位置标记的数据标签Y
+
+
+
+k = 3
+GMM = GaussianMix()
+GMM.train(trainSet, k, 50)
+Clusters = GMM.ClusterLabel
+labels = GMM.ClusterLabel
 
 
 
