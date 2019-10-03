@@ -135,7 +135,7 @@ class GaussianMix(object):
             #self.drawPics(x, MiuArr0, SigmaArr0, ClusterLabel)
             #计算似然函数，并判断是否继续更新
             #LLvalue1 = self.calLLvalue(GamaProbArr, GaussProbArr)
-            LLvalue1 = GaussProbArr.sum()
+            LLvalue1 = sum(np.log(GaussProbArr.sum(axis=1)+1.0e-6))
             print('似然值：',LLvalue1)
             if len(LLvalueList) == 0:
                 LLvalue0 = LLvalue1
@@ -383,33 +383,49 @@ os.chdir(r"D:\mywork\test")
 class GaussianMix(object):
     #1、类的属性
     def __init__(self):
-        self.trainSet = 0               #数据集
-        self.ClusterLabel = 0           #聚类标签
-        self.k = 0                      #聚类个数
+        self.Dl_Set = 0                 #已知标签的数据集
+        self.Dl_Label = 0               #已知标签的数据集的标签
+        self.Dl_Yset = 0                #已知标签的类别
+        self.Du_Set = 0                 #未知标签的数据集
+        self.Dl_Label = 0               #未知标签的数据集的目标标签
+        self.k = 0                      #聚类个数，应该是和标签类别数一致
         self.LL_ValueList = []          #最大似然函数的值列表
         self.AlphaArr = 0               #高斯混合模型混合系数
         self.MiuArr = 0                 #高斯分布函数的均值参数
         self.SigmaArr = 0               #高斯分布函数的协方差参数
-        self.m = 0                      #样本数
+        self.l = 0                      #已知标签的数据样本数
+        self.u = 0                      #未知标签的数据样本数
         self.d = 0                      #样本维度
         
-    #2、初始化函数参数
-    def initParas(self, x, k):
+    #2、初始化函数参数，原来无标记的时候是随机选取，现在可通过有标记的数据进行初始化
+    def initParas(self, X, Y):
         """
         input:
-            x:样本集,m*d,其中m为样本数,d为样本维度数
-            k:需要聚类的个数
+            X:样本集,m*d,其中m为样本数,d为样本维度数
+            Y:样本标签
         return:
-            初始化AlphaArr, MiuArr, SigmaArr
+            初始化k(高斯模型个数，理论上和分类数量一致？),AlphaArr, MiuArr, SigmaArr
         """
-        self.trainSet = x
-        self.k = k
-        self.m, self.d = np.shape(x)
-        AlphaArr0 = np.ones((1,k))/k
-        MiuArr0 = x[np.random.randint(0, self.m, k)]
-        #在这里固定好了
-        #MiuArr0 = x[[5,21,26]]
-        SigmaArr0 = np.array([(np.eye(self.d)*0.1).tolist()]*k)
+        self.l = []
+        Dl_Y = np.unique(Y)
+        m, d = X.shape
+        k=len(Dl_Y)
+        self.Dl_Yset = Dl_Y             #赋值每一类标签的值
+        self.d = d                      #样本维度
+        self.k = k                      #高斯模型个数
+        #2-1 按照已知标签的样本计算高斯模型的参数初始值
+        AlphaArr0 = np.ones((1,k))/k                        #高斯模型混合系数初始值
+        MiuArr0 = np.zeros((k,d))                           #高斯模型miu参数初始值
+        SigmaArr0 = np.array([(np.eye(d)).tolist()]*k)      #高斯模型sigma参数初始值
+        for idx, value in enumerate(Dl_Y):
+            Dl_Xi = X[np.nonzero(Y==value)[0],:]
+            MiuArr0[idx] = Dl_Xi.mean(axis=0)
+            Count_Xi = len(Dl_Xi)
+            self.l.append(Count_Xi)
+            SigmaArr0[idx] = np.dot((Dl_Xi - MiuArr0[idx]).T,(Dl_Xi - MiuArr0[idx]))/Count_Xi
+        #2-2 如果是二维的数据，可以把初始的分布用等高图画出来
+        #self.drawPics(X, MiuArr0, SigmaArr0, Y)
+        #print("==================以上是已标记数据初始化高斯函数参数分布图==================")
         return AlphaArr0, MiuArr0, SigmaArr0
 
     
@@ -440,11 +456,12 @@ class GaussianMix(object):
         return:
             GamaProbArr:每个样本出现对应每个高斯模型分布概率的矩阵,m*k维
         """
-        GaussProbArr = np.zeros((self.m, self.k))
-        for i in range(self.k):
-            miu = MiuArr[i]
-            sigma = SigmaArr[i]
-            GaussProbArr[:,i] = self.Gaussian_multi(x, miu, sigma)
+        m = x.shape[0]
+        GaussProbArr = np.zeros((m, self.k))
+        for idx, value in enumerate(self.Dl_Yset):
+            miu = MiuArr[idx]
+            sigma = SigmaArr[idx]
+            GaussProbArr[:,idx] = self.Gaussian_multi(x, miu, sigma)
         GamaProbArr = np.copy(np.multiply(GaussProbArr, AlphaArr))
         SumGamaProb = np.sum(GamaProbArr, axis=1).reshape(-1,1)
         return (GamaProbArr/SumGamaProb).round(4), GamaProbArr.round(4)
@@ -461,51 +478,70 @@ class GaussianMix(object):
             newSigmaArr:更新后的高斯分布的协方差矩阵,k*d*d维
             newAlphaArr:更新后的高斯模型的混合系数,1*k维
         """
+        m = x.shape[0]
         SumGamaProb = np.sum(GamaProbArr, axis=0)
         newMiuArr = np.zeros((self.k,self.d))
         newSigmaArr = np.zeros((self.k,self.d,self.d))
-        for i in range(self.k):
-            Gama = GamaProbArr[:,i].reshape(-1,1)
+        for idx, value in enumerate(self.Dl_Yset):
+            Gama = GamaProbArr[:,idx].reshape(-1,1)
             #更新均值
-            newMiu = np.sum(np.multiply(Gama, x), axis=0)/SumGamaProb[i]
-            newMiuArr[i] = newMiu
+            newMiu = (np.sum(np.multiply(Gama, x), axis=0)+\
+                      np.sum(self.Dl_Set[np.nonzero(self.Dl_Label==value)[0]], axis=0))/\
+                      (SumGamaProb[idx]+self.l[idx])
+            newMiuArr[idx] = newMiu
             #更新协方差矩阵
-            newSigma = np.dot(np.multiply(x-newMiu, Gama).T, x-newMiu)/SumGamaProb[i]
-            newSigmaArr[i] = newSigma
-        newAlphaArr = SumGamaProb.reshape(1,-1)/self.m
+            newSigma = (np.dot(np.multiply(x-newMiu, Gama).T, x-newMiu)+\
+                        np.dot((self.Dl_Set[np.nonzero(self.Dl_Label==value)[0]]-newMiu).T,(self.Dl_Set[np.nonzero(self.Dl_Label==value)[0]]-newMiu)))/\
+                        (SumGamaProb[idx]+self.l[idx])
+            newSigmaArr[idx] = newSigma
+        #更新高斯模型混合系数
+        newAlphaArr = (SumGamaProb.reshape(1,-1)+np.array(self.l).reshape(1,-1))/(m+sum(self.l))
         return newMiuArr, newSigmaArr, newAlphaArr
 
     #6、求似然函数值
-    def calLLvalue(self, GamaProbArr, GaussProbArr):
-        lnGaussProbArr = np.log(GaussProbArr+1.0e-6)
-        LLvalue = np.sum(np.multiply(GamaProbArr, lnGaussProbArr))
-        return LLvalue
+    def calLLvalue(self, Dl_GaussProbArr, Du_GaussProbArr):
+        Du_LLvalue = sum(np.log(Du_GaussProbArr.sum(axis=1)+1.0e-6))
+        #设置一个0，1矩阵，用来判断第i个标签==第k个高斯模型
+        Dl_yes = np.zeros((sum(self.l),self.k))
+        for idx, value in enumerate(self.Dl_Yset):
+            Dl_yes[np.nonzero(self.Dl_Label==value)[0],idx] = 1
+        Dl_LLvalue = sum(np.log(np.multiply(Dl_GaussProbArr, Dl_yes).sum(axis=1)+1.0e-6))
+        return Du_LLvalue+Dl_LLvalue
     
     #7、训练：判断是否符合停止条件
-    def train(self, x, k, iters):
+    def train(self, Dlx, Dly, Dux, iters):
         """
         循环迭代
         input:
-            x:样本集,m*d,其中m为样本数,d为样本维度数
-            k:聚类个数
+            Dlx:已知标记的数据集
+            Dly:已知标记的数据集的标签
+            Dux:未知标记的数据集
             iters:迭代次数
         return:
             ClusterLabel:最终的聚类结果
         """
         #初始化参数
-        AlphaArr0, MiuArr0, SigmaArr0 = self.initParas(x, k)
+        self.Dl_Set = Dlx
+        self.Dl_Label = Dly
+        self.Du_Set = Dux
+        AlphaArr0, MiuArr0, SigmaArr0 = self.initParas(Dlx, Dly)
         LLvalue0 = 0                #初始似然函数值
         LLvalueList = []            #最大似然值列表
         for i in range(iters):
-            #计算高斯分布模型的后验概率，也就是已知观测下来自于第k个高斯分布函数的概率
-            GamaProbArr, GaussProbArr = self.Gama_Prob(x, AlphaArr0, MiuArr0, SigmaArr0)
+            #计算已知标记数据集的高斯分布概率
+            Dl_GamaProbArr, Dl_GaussProbArr = self.Gama_Prob(Dlx, AlphaArr0, MiuArr0, SigmaArr0)
+            #计算未知标记数据集的高斯分布模型的后验概率，也就是已知观测下来自于第k个高斯分布函数的概率
+            Du_GamaProbArr, Du_GaussProbArr = self.Gama_Prob(Dux, AlphaArr0, MiuArr0, SigmaArr0)
             #计算聚类结果
-            ClusterLabel = np.argmax(GamaProbArr, axis=1)
+            ClusterLabel = np.argmax(Du_GamaProbArr, axis=1)
             #画分布图
-            self.drawPics(x, MiuArr0, SigmaArr0, ClusterLabel)
+            print("第%d次迭代："%i)
+            #self.drawPics(Dux, MiuArr0, SigmaArr0, ClusterLabel)        #未标记数据
+            #self.drawPics(Dlx, MiuArr0, SigmaArr0, Dly)                 #已标记数据
+            Count_errs = sum(ClusterLabel[:40]!=0)+sum(ClusterLabel[40:82]!=1)+sum(ClusterLabel[82:]!=2)
+            print("错误数：{}".format(Count_errs))
             #计算似然函数，并判断是否继续更新
-            #LLvalue1 = self.calLLvalue(GamaProbArr, GaussProbArr)
-            LLvalue1 = sum(GaussProbArr)
+            LLvalue1 = self.calLLvalue(Dl_GaussProbArr, Du_GaussProbArr)
             print('似然值：',LLvalue1)
             if len(LLvalueList) == 0:
                 LLvalue0 = LLvalue1
@@ -518,7 +554,7 @@ class GaussianMix(object):
                     LLvalue0 = LLvalue1
             LLvalueList.append(LLvalue1)
             #继续迭代，更新函数参数
-            MiuArr1, SigmaArr1, AlphaArr1 = self.updateParas(x, GamaProbArr)
+            MiuArr1, SigmaArr1, AlphaArr1 = self.updateParas(Dux, Du_GamaProbArr)
             MiuArr0 = np.copy(MiuArr1)
             SigmaArr0 = np.copy(SigmaArr1)
             AlphaArr0 = np.copy(AlphaArr1)
@@ -565,14 +601,15 @@ class GaussianMix(object):
             ygrid:y的网格坐标
             zgrid:(x,y)网格坐标上高斯分布函数的概率
         """
+        m = x.shape[0]
         x1 = np.copy(x[:,0])
         x1.sort()
         y1 = np.copy(x[:,1])
         y1.sort()
         x2,y2 = np.meshgrid(x1,y1)  # 获得网格坐标矩阵
-        Gp = np.zeros((self.m,self.m))
-        for i in range(self.m):
-            for j in range(self.m):
+        Gp = np.zeros((m,m))
+        for i in range(m):
+            for j in range(m):
                 xi = x2[i,j]
                 yi = y2[i,j]
                 data = np.array([xi,yi])
@@ -590,6 +627,7 @@ with open(r"D:\mywork\test\UCI_data\iris.data") as f:
     data = f.readlines()
 trainSet = np.array([row.split(',') for row in data[:-1]])
 trainSet = trainSet[:,:-1].astype('float')
+#trainSet = trainSet[:,[1,3]]
 trainSet = (trainSet - trainSet.mean(axis=0))/trainSet.std(axis=0)
 labelSet = np.zeros(trainSet.shape[0])
 labelSet[50:100] = 1; labelSet[100:] = 2                            #分段设置标签，0~50，50~100，100~150
@@ -600,19 +638,11 @@ DlLabel = labelSet[Dl_index]                                        #已知标�
 DuSet = np.delete(trainSet, Dl_index, axis=0)                       #作为未知标记的数据集Du
 DuLabel = np.delete(labelSet, Dl_index, axis=0)                     #作为位置标记的数据标签Y
 
-
-
-k = 3
+#训练
 GMM = GaussianMix()
-GMM.train(trainSet, k, 50)
-Clusters = GMM.ClusterLabel
+GMM.train(DlSet, DlLabel, DuSet, 50)
 labels = GMM.ClusterLabel
-
-
-
-
-
-
+Count_errs = sum(labels[:40]!=0)+sum(labels[40:82]!=1)+sum(labels[82:]!=2)
 
 
 
