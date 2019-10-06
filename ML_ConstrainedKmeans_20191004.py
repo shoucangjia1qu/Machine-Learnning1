@@ -193,3 +193,119 @@ if __name__ == "__main__":
     Ckm = Ckmeans()
     Ckm.cluster(data, K, M, C)
     clusters = Ckm.labels
+
+
+
+
+
+#Constrained_Seed_K-means聚类(约束种子k均值聚类)，另一种半监督聚类算法
+class CSeedkmeans(object):
+    #1、属性
+    def __init__(self):
+        self.K = 0          #聚类簇的个数
+        self.CntPoint = 0   #聚类中心点
+        self.labels = 0     #聚类类别
+        self.dists = 0      #每个点距离中心点的距离
+        self.Seed = 0       #种子集合
+    
+    #2、距离公式(采用欧式距离)
+    def calDist(self,v0,v1):
+        return np.linalg.norm(v0-v1)
+    
+    #3、中心标准化原数据
+    def stdData(self,train):
+        stdtrain = (train-np.mean(train,axis=0))/np.std(train,axis=0)
+        return stdtrain
+    
+    #4、初始化中心点，使用种子集合
+    def firstCntPoint(self,train,K):
+        m,n=np.shape(train)
+        points = np.zeros((K,n))
+        for i in range(K):
+            seed_xi = train[list(self.Seed[i]),:]
+            points[i,:] = np.mean(seed_xi, axis=0)
+        return points
+    
+    #5、主循环
+    def cluster(self, train, K, S, std=False):
+        """
+        Input:
+            train:训练集数
+            K:聚类个数
+            S:种子集合
+            std:是否中心标准化，默认否
+        """
+        #4-1 判断数据是否需要标准化
+        if std==True:
+            train = self.stdData(train)
+        self.Seed = S
+        #4-2 初始化中心点
+        CntPoint = self.firstCntPoint(train,K)
+        #整理出种子字典，种子列表
+        seed_dict = {}                          #种子字典每个种子对应着类别
+        for ss_idx, ss in enumerate(S):
+            for ss_value in ss:
+                seed_dict[ss_value] = ss_idx
+        seed_list = list(seed_dict.keys())      #种子列表存放着每个种子
+        #4－3 开始聚类
+        m, n = np.shape(train)
+        labellist = np.zeros(m)-1               #令所有样本的簇的初始值为-1
+        distlist = np.zeros(m)
+        flag = True
+        while flag:
+            flag = False
+            #每个点的聚类标签循环一遍
+            for i in range(m):
+                #如果是种子集合，则簇标签为已知标记
+                if i in seed_list:
+                    labellist[i] = seed_dict[i]
+                    continue
+                #非种子集合进行迭代
+                dists = [self.calDist(train[i,:],CntPoint[c,:]) for c in range(K)]
+                mindist = min(dists)
+                minIdx = dists.index(mindist)
+                #只要有一个样本的类不一致，就要再次循环
+                if minIdx != labellist[i]:
+                    flag = True
+                labellist[i] = minIdx
+                distlist[i] = mindist
+            #迭代每个中心点
+            for j in range(K):
+                dataSet = train[np.nonzero(labellist==j)[0],:]
+                if len(dataSet) != 0:
+                    CntPoint[j,:] = np.mean(dataSet,axis=0)
+                else:
+                    print("第{}个点无近似样本".format(j))
+            
+            #每次迭代画个图
+            #1、簇内的图，样本点、中心点、种子点
+            for clu in range(K):
+                plt.scatter(CntPoint[clu,0],CntPoint[clu,1],c="r",marker="D",linewidths=5)
+                plt.scatter(train[np.nonzero(labellist==clu)[0],0], train[np.nonzero(labellist==clu)[0],1])
+                plt.scatter(train[list(self.Seed[clu]),0], train[list(self.Seed[clu]),1], c="r")
+            plt.show()
+        self.K = K
+        self.CntPoint = CntPoint
+        self.labels = labellist
+        self.dists = distlist
+
+
+
+
+
+
+#开始训练
+if __name__ == "__main__":
+    ##############西瓜集数据4.0
+    data = np.array([[0.697,0.460],[0.774,0.376],[0.634,0.264],[0.608,0.318],[0.556,0.215],[0.403,0.237],[0.481,0.149],
+                     [0.437,0.211],[0.666,0.091],[0.243,0.267],[0.245,0.057],[0.343,0.099],[0.639,0.161],[0.657,0.198],
+                     [0.360,0.370],[0.593,0.042],[0.719,0.103],[0.359,0.188],[0.339,0.241],[0.282,0.257],[0.748,0.232],
+                     [0.714,0.346],[0.483,0.312],[0.478,0.437],[0.525,0.369],[0.751,0.489],[0.532,0.472],[0.473,0.376],
+                     [0.725,0.445],[0.446,0.459]])
+    Seed = [{3,24},{11,19},{13,16}]
+    K = 3
+    CSkm = CSeedkmeans()
+    CSkm.cluster(data, K, Seed)
+    clusters = CSkm.labels
+
+
