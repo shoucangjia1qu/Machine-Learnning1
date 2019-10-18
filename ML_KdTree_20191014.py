@@ -84,10 +84,38 @@ def build_kdTree(x):
     
 #构造kd树
 kd_Tree = build_kdTree(dataSet)
-    
-    
-    
-    
-    
+
+
+###2、搜索kd树
+#2.1递归寻找近似点
+def find_similar(target, kdTree):
+    d = kdTree['d']
+    d_value = kdTree['d_value']
+    target_dvalue = target[d]
+    if target_dvalue <= d_value:
+        left_tree = kdTree['left_set']
+        if isinstance(left_tree, dict):
+            similar_point = find_similar(target, left_tree)
+        else:
+            similar_point = left_tree
+    else:
+        right_tree = kdTree['right_set']
+        if isinstance(right_tree, dict):
+            similar_point = find_similar(target, right_tree)
+        else:
+            similar_point = right_tree
+    return similar_point
+
+target = np.array([10,10])   
+similar_point = find_similar(target, kd_Tree)
+
+
+
+
+
+
+
+
+
 
 
