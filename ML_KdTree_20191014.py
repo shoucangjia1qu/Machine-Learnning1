@@ -88,29 +88,94 @@ kd_Tree = build_kdTree(dataSet)
 
 ###2、搜索kd树
 #2.1递归寻找近似点
-def find_similar(target, kdTree):
+def find_similar(target, kd_Tree):
+    kdTree = copy.deepcopy(kd_Tree)
     d = kdTree['d']
     d_value = kdTree['d_value']
     target_dvalue = target[d]
     if target_dvalue <= d_value:
         left_tree = kdTree['left_set']
         if isinstance(left_tree, dict):
-            similar_point = find_similar(target, left_tree)
+            kdTree['left_set'] = find_similar(target, left_tree)
         else:
-            similar_point = left_tree
+            min_dist = np.linalg.norm(target-left_tree)             #计算目标样本与近似点的距离
+            min_point = left_tree
+            print("直接的最近距离：",min_dist)
+            print("直接的最近样本点：",min_point)
+            #计算划分平面上的点到目标样本的距离
+            if len(kdTree['d_set']) >= 1:
+                d_dist = min(np.linalg.norm((target - kdTree['d_set']), axis=1))
+                d_idx = np.argmin(np.linalg.norm((target - kdTree['d_set']), axis=1))
+                d_point = kdTree['d_set'][d_idx]
+                print("分类平面上的最近距离：",d_dist)
+                print("分类平面上的最近样本点：",d_point)
+                if d_dist < min_dist:
+                    min_dist = copy.deepcopy(d_dist)
+                    min_point = copy.deepcopy(d_point)
+            #计算右边的子集，获取最近点
+            if abs(target[kdTree['d']] - kdTree['d_value']) <= min_dist:
+                right_tree = kdTree['right_set']
+                #右边子树寻找最小点，递归
+                print("    新的递归*********")
+                right_point = find_minpoint(target, right_tree)
+                print("    新的递归结束*********")
+                right_dist = np.linalg.norm(target-right_point)
+                print("分类另一面的最近距离：",right_dist)
+                print("分类另一面的最近样本点：",right_point)
+                if right_dist < min_dist:
+                    min_dist = copy.deepcopy(right_dist)
+                    min_point = copy.deepcopy(right_point)
+            return min_point
     else:
         right_tree = kdTree['right_set']
         if isinstance(right_tree, dict):
-            similar_point = find_similar(target, right_tree)
+            kdTree['right_set'] = find_similar(target, right_tree)
         else:
-            similar_point = right_tree
-    return similar_point
+            min_dist = np.linalg.norm(target-right_tree)             #计算目标样本与近似点的距离
+            min_point = right_tree
+            print("直接的最近距离：",min_dist)
+            print("直接的最近样本点：",min_point)
+            #计算划分平面上的点到目标样本的距离
+            if len(kdTree['d_set']) >= 1:
+                d_dist = min(np.linalg.norm((target - kdTree['d_set']), axis=1))
+                d_idx = np.argmin(np.linalg.norm((target - kdTree['d_set']), axis=1))
+                d_point = kdTree['d_set'][d_idx]
+                print("分类平面上的最近距离：",d_dist)
+                print("分类平面上的最近样本点：",d_point)
+                if d_dist < min_dist:
+                    min_dist = copy.deepcopy(d_dist)
+                    min_point = copy.deepcopy(d_point)
+            #计算右边的子集，获取最近点
+            if abs(target[kdTree['d']] - kdTree['d_value']) <= min_dist:
+                left_tree = kdTree['right_set']
+                #左边子树寻找最小点，递归
+                print("    新的递归*********")
+                left_point = find_minpoint(target, left_tree)
+                print("    新的递归结束*********")
+                left_dist = np.linalg.norm(target-left_point)
+                print("分类另一面的最近距离：",left_dist)
+                print("分类另一面的最近样本点：",left_point)
+                if left_dist < min_dist:
+                    min_dist = copy.deepcopy(left_dist)
+                    min_point = copy.deepcopy(left_point)
+            return min_point
+    return kdTree
 
-target = np.array([10,10])   
-similar_point = find_similar(target, kd_Tree)
+#2.2递归向上回退
+def find_minpoint(target, kdTree):
+    while isinstance(kdTree, dict):
+        print("【结构树】:",kdTree)
+        new_kdTree = find_similar(target, kdTree)
+        kdTree = copy.deepcopy(new_kdTree)
+        print("【新结构树】:",kdTree)
+        print("====================")
+    else:
+        print("【树叶节点是】:",kdTree)
+        return kdTree
 
-
-
+#测试
+target = np.array([5.5, -1])
+p = find_minpoint(target, kd_Tree)
 
 
 
