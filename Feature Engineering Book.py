@@ -74,6 +74,80 @@ pd.qcut(yelp_df.review_count, q=4, labels=False, retbins=True)[1]   #用qcut取�
 
 
 ##对数变换
+'''1、画图（变换前和变换后）,Yelp商家点评数据集'''
+yelp_df['log_review_count'] = np.log(yelp_df.review_count+1)        #对数变换
+'''自己的方法'''
+plt.subplot(2,1,1)
+yelp_df['log_review_count'].hist(bins=100)
+plt.subplot(2,1,2)
+yelp_df['review_count'].hist(bins=100)
+'''书上的方法'''
+fig, (ax1, ax2) = plt.subplots(2,1)
+yelp_df['review_count'].hist(ax=ax1, bins=100)
+ax1.tick_params(labelsize=14)
+ax1.set_xlabel('review_count', fontsize=14)
+ax1.set_ylabel('Occurrence', fontsize=14)
+
+yelp_df['log_review_count'].hist(ax= ax2, bins=100)
+ax2.tick_params(labelsize=14)
+ax2.set_xlabel('log10(review_count)', fontsize=14)
+ax2.set_ylabel('Occurrence', fontsize=14)
+
+'''2、再画图，在线新闻数据集'''
+news_df = pd.read_csv(r"E:\data\Feature engineer\OnlineNewsPopularity.csv", delimiter=",")
+news_df['log_n_tokens_content'] = np.log(news_df[' n_tokens_content']+1)
+
+plt.subplot(2,1,1)
+plt.tick_params(labelsize=14)
+plt.xlabel('Number of Words in Article', fontsize=14)
+plt.ylabel('Number of Articles', fontsize=12)
+news_df[' n_tokens_content'].hist(bins=100)
+
+plt.subplot(2,1,2)
+plt.tick_params(labelsize=14)
+plt.xlabel('Log of Number of Words', fontsize=14)
+plt.ylabel('Number of Articles', fontsize=12)
+news_df['log_n_tokens_content'].hist(bins=100)
+
+'''实战1：使用对数变换后的Yelp点评数量预测商家的平均评分'''
+import json
+from sklearn import linear_model
+from sklearn.model_selection import cross_val_score
+
+with open(r"E:\data\Feature engineer\yelp_academic_dataset_business.json") as f:
+    yelp_json = f.readlines()
+yelp_List = [json.loads(row) for row in yelp_json]
+yelp_df = pd.DataFrame(yelp_List)
+yelp_df['log_review_count'] = np.log(yelp_df.review_count + 1)
+
+clf_ori = linear_model.LinearRegression()                   #原始数据集的线性模型
+scores_ori = cross_val_score(clf_ori, yelp_df[['review_count']], yelp_df['stars'], cv=10)
+print("R-squared score without log transform:%.5f (+/-%.5f)"%(scores_ori.mean(), scores_ori.std()*2))
+
+clf_log = linear_model.LinearRegression()                   #对数转换后数据集的线性模型
+scores_log = cross_val_score(clf_log, yelp_df[['log_review_count']], yelp_df['stars'], cv=10)
+print("R-squared score without log transform:%.5f (+/-%.5f)"%(scores_log.mean(), scores_log.std()*2))
+
+'''实战2：使用对数变换后的新闻数据预测分享数'''
+news_df['log_n_tokens_content'] = np.log(news_df[' n_tokens_content'] + 1)
+
+clf_ori = linear_model.LinearRegression()                   #新闻原数据集的线性模型
+scores_ori = cross_val_score(clf_ori, news_df[[' n_tokens_content']], news_df[' shares'], cv=10)
+print("R-squared score without log transform:%.5f (+/-%.5f)"%(scores_ori.mean(), scores_ori.std()*2))
+
+clf_log = linear_model.LinearRegression()                   #新闻对数转换后数据集的线性模型
+scores_log = cross_val_score(clf_log, news_df[['log_n_tokens_content']], news_df[' shares'], cv=10)
+print("R-squared score without log transform:%.5f (+/-%.5f)"%(scores_log.mean(), scores_log.std()*2))
+
+
+
+
+
+
+
+
+
+
 
 
 
